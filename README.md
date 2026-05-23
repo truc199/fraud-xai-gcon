@@ -57,6 +57,18 @@ uv run run_pipeline.py
 * Calculates TreeSHAP attributions, off-diagonal interaction pairs (toxic combinations), and decision boundary counterfactual target values.
 * Exports anomaly alerts and component configuration files to the `data/` folder.
 
+### Step 4: Run the Web Dashboard
+Start the FastAPI server to access the premium glassmorphic dark-theme UI:
+```bash
+uv run uvicorn app:app --host 0.0.0.0 --port 8000
+```
+Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+**What this does**:
+* **Sidebar History**: Lists all previous CSV/JSON runs.
+* **Console Terminal**: Displays live execution console output in the browser when the pipeline is running.
+* **Alert Cards Grid**: Displays detailed transaction alert cards with color-coded SHAP progress bars, toxic interactions, and recourse recommendations.
+
 ---
 
 ## 3. Pipeline Output Files

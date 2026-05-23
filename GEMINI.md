@@ -57,3 +57,17 @@ Each execution of `uv run run_pipeline.py` dynamically creates the following out
     *   *Content*: Timestamped CSV archive of the anomaly logs.
 *   `data/exports/anomaly_alerts_YYYYMMDD_HHMMSS_metadata.json`
     *   *Content*: Timestamped companion JSON metadata configuration archive.
+
+---
+
+## 4. Web UI Dashboard
+This project includes a FastAPI-powered glassmorphic dark-theme web dashboard to trigger pipeline runs and visualize explanation results.
+
+*   **Execution Command**:
+    ```bash
+    uv run uvicorn app:app --host 0.0.0.0 --port 8000
+    ```
+*   **Web Endpoints**:
+    *   `GET /`: Serves the dashboard page.
+    *   `GET /api/exports`: Scans `data/` and returns parsed CSV records and companion JSON metadata.
+    *   `GET /api/run/stream`: Spawns `run_pipeline.py` and streams execution logs using Server-Sent Events (SSE).
