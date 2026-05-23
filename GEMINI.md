@@ -1,0 +1,1 @@
+This project use `uv` as package manager, use `uv add <package>` not `pip install <package>`, use `uv run <file.py>` not `python <file.py>`
