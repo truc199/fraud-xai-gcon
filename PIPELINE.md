@@ -1,6 +1,10 @@
+> [!WARNING]
+> **Outdated Documentation**: The pipeline evolves over time.
+
 # Modular Cohort Fraud & xAI Pipeline Documentation
 
-A production-grade, highly modular, protocol-driven machine learning pipeline for banking fraud detection and Explainable AI (xAI). 
+
+A highly modular, protocol-driven machine learning pipeline for banking fraud detection and Explainable AI (xAI). 
 
 ---
 

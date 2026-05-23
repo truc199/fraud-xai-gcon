@@ -2,7 +2,7 @@
 
 An advanced, production-ready machine learning framework for banking fraud detection and Explainable AI (xAI). It combines unsupervised ensemble methods with Positive-Unlabeled (PU) XGBoost classifiers, exact SHAP explanations, joint feature interaction matrices, and decision boundary counterfactual alerts.
 
-For a detailed breakdown of the mathematical formulations, preprocessing steps, and architectural choices, see [PIPELINE.md](file:///home/hoang/python/gcontest/PIPELINE.md).
+For a detailed breakdown of the mathematical formulations, preprocessing steps, and architectural choices, see [PIPELINE.md](PIPELINE.md).
 
 ---
 
@@ -31,7 +31,7 @@ gcontest/
 ### Step 1: Install Dependencies
 This project uses `uv` for ultra-fast, reproducible dependency management. Install the required libraries into the local virtual environment:
 ```bash
-uv sync
+uv add scikit-learn shap openpyxl pandas xgboost torch
 ```
 
 ### Step 2: Clean Data & Build SQLite Database
@@ -55,4 +55,29 @@ uv run run_pipeline.py
 * Computes unsupervised anomalies blending Isolation Forests and PyTorch Autoencoders.
 * Refines thresholds using a sample-weighted PU-Learning XGBoost classifier.
 * Calculates TreeSHAP attributions, off-diagonal interaction pairs (toxic combinations), and decision boundary counterfactual target values.
-* Overwrites `data/anomaly_alerts_latest.csv` and saves a timestamped CSV archive under `data/exports/` listing anomalies only.
+* Exports anomaly alerts and component configuration files to the `data/` folder.
+
+---
+
+## 3. Pipeline Output Files
+
+Running `run_pipeline.py` creates the following files in the `data/` directory:
+
+*   `data/anomaly_alerts_latest.csv`: Latest anomaly-only transaction alerts (filtered by prediction flag). Features reordered to display critical xAI outputs (`CUSTOMER_NUMBER`, `ANOMALY_SCORE`, `EXPLANATION`, `TOP_SHAP_CONTRIBUTORS`, `TOP_INTERACTIONS`, `COUNTERFACTUAL`) first.
+*   `data/anomaly_alerts_latest_metadata.json`: A companion metadata JSON mapping the **exact classes and components** (e.g. data loader, preprocessor, model agent, explainer, plugins) used in that specific pipeline run.
+*   `data/exports/anomaly_alerts_YYYYMMDD_HHMMSS.csv`: Timestamped CSV archive of the anomaly alerts.
+*   `data/exports/anomaly_alerts_YYYYMMDD_HHMMSS_metadata.json`: Timestamped companion JSON metadata configuration archive.
+
+---
+
+## 4. Component Extensions Policy (No Code Deletion)
+
+The pipeline enforces separation of concerns via strictly typed Python Protocols (`src/pipeline/protocols.py`). When testing new pipeline modules:
+
+1.  **NEVER delete or overwrite existing component code** in the codebase (e.g., in `src/pipeline/data_loaders.py`).
+2.  **Create a new file** in the appropriate directory (e.g. `src/pipeline/second_order_markov_loader.py`).
+3.  **Implement your new class** (e.g., `SecondOrderMarkovDataLoader`) conforming to the target Protocol.
+4.  **Plug the new component** into `run_pipeline.py` by importing it and swapping instances in the initialization block:
+    ```python
+    data_loader = SecondOrderMarkovDataLoader(db_path=DB_PATH)
+    ```

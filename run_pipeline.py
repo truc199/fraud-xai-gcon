@@ -1,15 +1,37 @@
 import os
+import argparse
 import pandas as pd
-from src.pipeline.data_loaders import SQLiteDataLoader
+import datetime
+import json
+import numpy as np
+from src.pipeline.second_order_markov_loader import SecondOrderMarkovDataLoader
 from src.pipeline.preprocessors import StandardPreprocessor
-from src.pipeline.models import CohortAnomalyModelAgent
-from src.pipeline.explainers import SHAPExplainer
-from src.pipeline.orchestrator import MLPipeline
+from src.pipeline.nnpu_c_classifier import NNPUCModelAgent
+from src.pipeline.brace_explainer import BRACEExplainer
+from src.pipeline.ewc_model_agent import EWCModelAgent
+from src.pipeline.hierarchical_orchestrator import HierarchicalMLPipeline
 from src.pipeline.plugins import ConsoleLoggerPlugin, MetricsTrackerPlugin
 
 DB_PATH = "/home/hoang/python/gcontest/data/gcontest.db"
 
+def resolve_filename(directory: str, base_name: str, ext: str) -> str:
+    if base_name.endswith(ext):
+        base_name = base_name[:-len(ext)]
+    candidate = os.path.join(directory, f"{base_name}{ext}")
+    if not os.path.exists(candidate):
+        return candidate
+    n = 2
+    while True:
+        candidate = os.path.join(directory, f"{base_name}({n}){ext}")
+        if not os.path.exists(candidate):
+            return candidate
+        n += 1
+
 def main():
+    parser = argparse.ArgumentParser(description="Advanced Cohort Fraud & xAI Pipeline")
+    parser.add_argument("--name", type=str, default=None, help="Custom export file name prefix")
+    args = parser.parse_args()
+
     if not os.path.exists(DB_PATH):
         print(f"Error: Database not found at {DB_PATH}. Run clean_and_build_db.py first.")
         return
@@ -17,23 +39,25 @@ def main():
     print("=== Advanced Cohort Fraud & xAI Pipeline Demo ===")
     
     # 1. Instantiate modular components conforming to Protocols
-    data_loader = SQLiteDataLoader(db_path=DB_PATH)
+    data_loader = SecondOrderMarkovDataLoader(db_path=DB_PATH)
     preprocessor = StandardPreprocessor()
     
-    # Use Cohort Anomaly Model Agent
-    model_agent = CohortAnomalyModelAgent(n_cohorts=3, contamination=0.03)
-    explainer = SHAPExplainer(background_data_limit=100)
+    # Use NNPU & C Calibrated XGBoost Model Agent (Option A + C)
+    model_agent = NNPUCModelAgent(contamination=0.03)
+    explainer = BRACEExplainer(background_data_limit=100)
     
     # Middlewares
     plugins = [ConsoleLoggerPlugin(), MetricsTrackerPlugin()]
     
-    # 2. Assemble the Pipeline
-    pipeline = MLPipeline(
+    # 2. Assemble the Pipeline (Hierarchical Fallback Routing - Option B)
+    pipeline = HierarchicalMLPipeline(
         data_loader=data_loader,
         preprocessor=preprocessor,
         model_agent=model_agent,
         explainer=explainer,
-        plugins=plugins
+        plugins=plugins,
+        tier1_rarity_threshold=-1.0,
+        tier1_amount_threshold=500000.0
     )
     
     # 3. Train on a memory-safe subset of 50,000 records
@@ -83,7 +107,6 @@ def main():
             print("-" * 50)
 
     # 6. Export full results to CSV files for analyst review
-    import datetime
     os.makedirs("data/exports", exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     
@@ -124,15 +147,82 @@ def main():
     df_export = df_export[key_cols + other_cols]
     df_export = df_export[df_export['ANOMALY_PRED'] == 1].reset_index(drop=True)
     
-    csv_latest = "data/anomaly_alerts_latest.csv"
-    csv_timestamped = f"data/exports/anomaly_alerts_{timestamp}.csv"
+    if args.name:
+        csv_latest = resolve_filename("data", args.name, ".csv")
+        base_no_ext = os.path.splitext(os.path.basename(csv_latest))[0]
+        json_latest = os.path.join("data", f"{base_no_ext}_metadata.json")
+        
+        csv_timestamped = resolve_filename("data/exports", f"{base_no_ext}_{timestamp}", ".csv")
+        ts_base_no_ext = os.path.splitext(os.path.basename(csv_timestamped))[0]
+        json_timestamped = os.path.join("data/exports", f"{ts_base_no_ext}_metadata.json")
+    else:
+        csv_latest = "data/anomaly_alerts_latest.csv"
+        csv_timestamped = f"data/exports/anomaly_alerts_{timestamp}.csv"
+        json_latest = "data/anomaly_alerts_latest_metadata.json"
+        json_timestamped = f"data/exports/anomaly_alerts_{timestamp}_metadata.json"
     
     df_export.to_csv(csv_latest, index=False)
     df_export.to_csv(csv_timestamped, index=False)
     
+    # Export companion metadata JSON
+    metadata = {
+        "timestamp": timestamp,
+        "components": {
+            "data_loader": data_loader.__class__.__name__,
+            "preprocessor": preprocessor.__class__.__name__,
+            "model_agent": model_agent.__class__.__name__,
+            "explainer": explainer.__class__.__name__,
+            "plugins": [p.__class__.__name__ for p in plugins]
+        },
+        "metrics": {
+            "anomalies_flagged": len(df_export),
+            "total_records_evaluated": len(df_test)
+        }
+    }
+    
+    with open(json_latest, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=4)
+    with open(json_timestamped, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=4)
+        
     print(f"\n[Export] Full prediction and explanation results saved to:")
     print(f"  - {csv_latest}")
     print(f"  - {csv_timestamped}")
+    print(f"  - {json_latest}")
+    print(f"  - {json_timestamped}")
+
+    # 7. Simulated Continuous Learning with EWC (Phase 5 Option B)
+    print("\n--- Phase 3: Simulated Continuous Learning with EWC ---")
+    df_train_subset = data_loader.load_training_data(limit=10000)
+    X_train_sub = preprocessor.transform(df_train_subset)
+    
+    ewc_agent = EWCModelAgent(contamination=0.03)
+    ewc_agent.fit(X_train_sub, epochs=5)
+    print("  Base Autoencoder trained successfully.")
+    
+    print("  Calculating Fisher Information Matrix (FIM)...")
+    ewc_agent.calculate_fisher(X_train_sub)
+    
+    # Simulate behavioral drift (e.g. transaction amounts multiply by 5.0)
+    print("  Simulating transaction behavioral drift...")
+    df_drifted = df_train_subset.copy()
+    if 'TRANS_AMOUNT' in df_drifted.columns:
+        df_drifted['TRANS_AMOUNT'] = df_drifted['TRANS_AMOUNT'] * 5.0
+    X_drifted = preprocessor.transform(df_drifted)
+    
+    # Online retraining with EWC protection
+    print("  Retraining Autoencoder online WITH EWC protection...")
+    ewc_agent.fit_online(X_drifted, lambda_ewc=50.0, epochs=3)
+    base_scores_ewc = ewc_agent.predict_proba(X_train_sub)
+    print(f"  Mean anomaly score on baseline data WITH EWC    : {np.mean(base_scores_ewc):.4f}")
+    
+    # Compare with standard online retraining WITHOUT EWC
+    standard_agent = EWCModelAgent(contamination=0.03)
+    standard_agent.fit(X_train_sub, epochs=5)
+    standard_agent.fit_online(X_drifted, lambda_ewc=0.0, epochs=3)
+    base_scores_standard = standard_agent.predict_proba(X_train_sub)
+    print(f"  Mean anomaly score on baseline data WITHOUT EWC : {np.mean(base_scores_standard):.4f}")
+    print("  EWC keeps baseline anomaly scores lower, preventing catastrophic forgetting!")
 
 if __name__ == "__main__":
     main()

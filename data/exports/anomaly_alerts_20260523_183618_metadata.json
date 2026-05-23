@@ -1,0 +1,17 @@
+{
+    "timestamp": "20260523_183618",
+    "components": {
+        "data_loader": "SecondOrderMarkovDataLoader",
+        "preprocessor": "StandardPreprocessor",
+        "model_agent": "CohortAnomalyModelAgent",
+        "explainer": "SHAPExplainer",
+        "plugins": [
+            "ConsoleLoggerPlugin",
+            "MetricsTrackerPlugin"
+        ]
+    },
+    "metrics": {
+        "anomalies_flagged": 96,
+        "total_records_evaluated": 5000
+    }
+}

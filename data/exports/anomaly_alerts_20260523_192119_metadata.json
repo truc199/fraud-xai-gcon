@@ -1,0 +1,17 @@
+{
+    "timestamp": "20260523_192119",
+    "components": {
+        "data_loader": "SecondOrderMarkovDataLoader",
+        "preprocessor": "StandardPreprocessor",
+        "model_agent": "CorrelationDiscrepancyModelAgent",
+        "explainer": "CorrelationDiscrepancyExplainer",
+        "plugins": [
+            "ConsoleLoggerPlugin",
+            "MetricsTrackerPlugin"
+        ]
+    },
+    "metrics": {
+        "anomalies_flagged": 166,
+        "total_records_evaluated": 5000
+    }
+}
