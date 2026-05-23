@@ -204,9 +204,15 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span class="card-badge">Alert #${idx + 1}</span>
                         <span style="font-size: 13px; color: var(--color-text-muted); margin-left: 10px;">Score: ${score}</span>
                     </div>
-                    <div class="card-amount-area">
-                        <div class="card-amount">${formattedAmt}</div>
-                        <div class="card-customer">Cust ID: ${customerId} | Avg: ${formattedAvgAmt}</div>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <button class="copy-card-btn" title="Copy Alert Summary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            <span>Copy</span>
+                        </button>
+                        <div class="card-amount-area">
+                            <div class="card-amount">${formattedAmt}</div>
+                            <div class="card-customer">Cust ID: ${customerId} | Avg: ${formattedAvgAmt}</div>
+                        </div>
                     </div>
                 </div>
 
@@ -255,6 +261,55 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 ` : ""}
             `;
+
+            // Bind click handler to copy button
+            const copyBtn = card.querySelector(".copy-card-btn");
+            if (copyBtn) {
+                copyBtn.addEventListener("click", () => {
+                    let text = `[FRAUD ALERT SUMMARY]\n`;
+                    text += `* Transaction Index: ${row.instance_index || "Unknown"}\n`;
+                    text += `* Risk Score: ${score}\n`;
+                    text += `* Customer ID: ${customerId}\n`;
+                    text += `* Transaction Type: ${row.TRANS_LV1 || "Unknown"} / ${row.TRANS_LV2 || "Unknown"}\n`;
+                    text += `* Amount: ${formattedAmt} (Historical Avg: ${formattedAvgAmt})\n`;
+                    text += `* Explanation Narrative: ${row.EXPLANATION || "No explanation provided"}\n`;
+                    
+                    if (row.TOP_SHAP_CONTRIBUTORS) {
+                        text += `* Top SHAP Drivers:\n`;
+                        row.TOP_SHAP_CONTRIBUTORS.split(",").forEach(d => {
+                            text += `  - ${d.trim()}\n`;
+                        });
+                    }
+                    if (row.TOP_INTERACTIONS) {
+                        text += `* Toxic Feature Interactions:\n`;
+                        row.TOP_INTERACTIONS.split(",").forEach(i => {
+                            text += `  - ${i.trim()}\n`;
+                        });
+                    }
+                    if (row.COUNTERFACTUAL) {
+                        text += `* Actionable Recourse:\n`;
+                        row.COUNTERFACTUAL.split(",").forEach(c => {
+                            text += `  - ${c.trim()}\n`;
+                        });
+                    }
+                    
+                    navigator.clipboard.writeText(text).then(() => {
+                        const span = copyBtn.querySelector("span");
+                        span.textContent = "Copied!";
+                        copyBtn.style.backgroundColor = "rgba(16, 185, 129, 0.15)";
+                        copyBtn.style.borderColor = "var(--color-accent-green)";
+                        copyBtn.style.color = "var(--color-accent-green)";
+                        setTimeout(() => {
+                            span.textContent = "Copy";
+                            copyBtn.style.backgroundColor = "";
+                            copyBtn.style.borderColor = "";
+                            copyBtn.style.color = "";
+                        }, 2000);
+                    }).catch(err => {
+                        console.error("Failed to copy card text:", err);
+                    });
+                });
+            }
 
             alertsGrid.appendChild(card);
         });
