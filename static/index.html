@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GContest Fraud Pipeline Dashboard</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Vanilla CSS -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+    <div class="dashboard-container">
+        
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="glow-dot"></div>
+                <h2>GContest AI</h2>
+            </div>
+            
+            <button id="runBtn" class="pulse-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <span>Trigger Pipeline</span>
+            </button>
+            
+            <div class="run-history-section">
+                <h3>Exported Runs</h3>
+                <ul id="historyList" class="history-list">
+                    <li class="loading-item">Loading history...</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="main-content">
+            <header class="main-header">
+                <div class="title-area">
+                    <h1 id="runTitle">Latest Pipeline Run</h1>
+                    <span id="runTimestamp" class="timestamp-badge">-</span>
+                </div>
+            </header>
+
+            <!-- Real-time Terminal Panel -->
+            <section id="terminalContainer" class="terminal-container hidden">
+                <div class="terminal-header">
+                    <span class="terminal-dot red"></span>
+                    <span class="terminal-dot yellow"></span>
+                    <span class="terminal-dot green"></span>
+                    <span class="terminal-title">Console Pipeline Log</span>
+                    <button id="closeTerminalBtn" class="close-terminal-btn">&times;</button>
+                </div>
+                <div id="terminalLog" class="terminal-log"></div>
+            </section>
+
+            <!-- Metadata Metrics -->
+            <section class="metrics-grid">
+                <div class="metric-card glass">
+                    <div class="metric-label">Flagged Anomalies</div>
+                    <div id="metricAlerts" class="metric-val text-red">0</div>
+                    <div id="metricRate" class="metric-sub">0.00% alert rate</div>
+                </div>
+                <div class="metric-card glass">
+                    <div class="metric-label">Evaluated Records</div>
+                    <div id="metricTotal" class="metric-val">0</div>
+                    <div class="metric-sub">Test batch size</div>
+                </div>
+                <div class="metric-card glass">
+                    <div class="metric-label">Model Pipeline Agent</div>
+                    <div id="metricModel" class="metric-val-sm">-</div>
+                    <div class="metric-sub">Active detector</div>
+                </div>
+                <div class="metric-card glass">
+                    <div class="metric-label">Explainer Engine</div>
+                    <div id="metricExplainer" class="metric-val-sm">-</div>
+                    <div class="metric-sub">xAI interpreter</div>
+                </div>
+            </section>
+
+            <!-- Anomaly Alerts Cards List -->
+            <section class="alerts-section">
+                <h2>Anomaly Alert Cards</h2>
+                <div id="alertsGrid" class="alerts-grid">
+                    <div class="empty-state">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <p>No run selected or no anomalies found.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <!-- Vanilla JS -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
