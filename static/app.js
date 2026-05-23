@@ -172,7 +172,14 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        anomalies.forEach((row, idx) => {
+        // Sort anomalies descending by ANOMALY_SCORE
+        const sortedAnomalies = [...anomalies].sort((a, b) => {
+            const scoreA = parseFloat(a.ANOMALY_SCORE ?? 0.0);
+            const scoreB = parseFloat(b.ANOMALY_SCORE ?? 0.0);
+            return scoreB - scoreA;
+        });
+
+        sortedAnomalies.forEach((row, idx) => {
             const card = document.createElement("article");
             card.className = "anomaly-card";
 
