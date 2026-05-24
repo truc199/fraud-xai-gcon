@@ -31,7 +31,7 @@ gcontest/
 ### Step 1: Install Dependencies
 This project uses `uv` for ultra-fast, reproducible dependency management. Install the required libraries into the local virtual environment:
 ```bash
-uv add scikit-learn shap openpyxl pandas xgboost torch
+uv sync
 ```
 
 ### Step 2: Clean Data & Build SQLite Database

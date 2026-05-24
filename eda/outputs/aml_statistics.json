@@ -1,0 +1,12 @@
+{
+    "structuring": {
+        "total_structured_transactions": 9012,
+        "structuring_alerts": 1130
+    },
+    "mule_fan_out": {
+        "total_mule_alerts": 107925,
+        "max_unique_beneficiaries_24h": 27,
+        "p95_unique_beneficiaries_24h": 5.0,
+        "p99_unique_beneficiaries_24h": 10.0
+    }
+}

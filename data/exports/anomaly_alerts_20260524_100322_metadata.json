@@ -1,0 +1,17 @@
+{
+    "timestamp": "20260524_100322",
+    "components": {
+        "data_loader": "SecondOrderMarkovDataLoader",
+        "preprocessor": "StandardPreprocessor",
+        "model_agent": "NNPUCModelAgent",
+        "explainer": "BRACEExplainer",
+        "plugins": [
+            "ConsoleLoggerPlugin",
+            "MetricsTrackerPlugin"
+        ]
+    },
+    "metrics": {
+        "anomalies_flagged": 98,
+        "total_records_evaluated": 5000
+    }
+}

@@ -1,0 +1,36 @@
+{
+    "high_risk_categories": {
+        "total_first_time_high_risk_uses": 24329,
+        "total_first_time_high_risk_high_value_alerts": 678
+    },
+    "merchant_concentration": {
+        "total_unique_merchants": 119,
+        "top_5_merchants": {
+            "BANK_TRANSFER_GATEWAY": {
+                "unique_customers": 46204,
+                "total_transactions": 989006,
+                "total_amount": 10890308817423.29
+            },
+            "TELCO_MOBIFONE": {
+                "unique_customers": 15469,
+                "total_transactions": 59403,
+                "total_amount": 4512020000.0
+            },
+            "TELCO_VINAPHONE": {
+                "unique_customers": 15464,
+                "total_transactions": 59446,
+                "total_amount": 4563590000.0
+            },
+            "TELCO_VIETTEL": {
+                "unique_customers": 15425,
+                "total_transactions": 58963,
+                "total_amount": 4494480000.0
+            },
+            "SHOPEEPAY": {
+                "unique_customers": 9603,
+                "total_transactions": 42741,
+                "total_amount": 14530873844.0
+            }
+        }
+    }
+}

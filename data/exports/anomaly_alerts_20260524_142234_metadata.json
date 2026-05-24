@@ -1,0 +1,18 @@
+{
+    "timestamp": "20260524_142234",
+    "components": {
+        "orchestrator": "AdvancedHierarchicalMLPipeline",
+        "data_loader": "AdvancedDataLoader",
+        "preprocessor": "AdvancedPreprocessor",
+        "model_agent": "NNPUCModelAgent",
+        "explainer": "BRACEExplainer",
+        "plugins": [
+            "ConsoleLoggerPlugin",
+            "MetricsTrackerPlugin"
+        ]
+    },
+    "metrics": {
+        "anomalies_flagged": 149,
+        "total_records_evaluated": 5000
+    }
+}

@@ -1,0 +1,12 @@
+{
+    "device_metrics": {
+        "total_os_drift_alerts": 8227,
+        "total_rare_os_transactions": 0,
+        "global_os_distribution": {
+            "IOS": 0.5438841209283302,
+            "ANDROID": 0.40157471985783094,
+            "WEB": 0.05454115921383892
+        },
+        "rare_os_detected": []
+    }
+}

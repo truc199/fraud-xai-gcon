@@ -71,3 +71,16 @@ This project includes a FastAPI-powered glassmorphic dark-theme web dashboard to
     *   `GET /`: Serves the dashboard page.
     *   `GET /api/exports`: Scans `data/` and returns parsed CSV records and companion JSON metadata.
     *   `GET /api/run/stream`: Spawns `run_pipeline.py` and streams execution logs using Server-Sent Events (SSE).
+
+---
+
+## 5. Exploratory Data Analysis (EDA) Guidelines
+*   **Location:** All EDA scripts, code, and textual analysis results must be placed in the `./eda` folder.
+*   **Execution & Outputs:** 
+    *   Every EDA script must persist its extracted features, aggregations, or intermediate results.
+    *   All persistent outputs (e.g. CSVs, JSONs, parquet files, or pickle caches) must be written to the `./eda/outputs` folder.
+    *   Subsequent analysis should read from these persisted outputs to avoid re-running expensive database queries or aggregations.
+*   **Relative Paths:** All file paths must be defined relatively (e.g., using `os.path.dirname(__file__)` or relative to the workspace root). Hardcoding absolute paths is strictly prohibited to ensure portability across devices.
+*   **No Metaphors:** All documentation, explanations, and code comments must use direct, literal language. Avoid metaphors, analogies, or descriptive figures of speech.
+
+

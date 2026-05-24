@@ -5,3 +5,5 @@ data/*
 .venv/
 __pycache__/
 *.log
+eda/outputs/*.csv.gz
+

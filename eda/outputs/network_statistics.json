@@ -1,0 +1,16 @@
+{
+    "shared_devices": {
+        "max_customers_per_device": 1,
+        "p90_customers_per_device": 1.0,
+        "p95_customers_per_device": 1.0,
+        "p99_customers_per_device": 1.0,
+        "transactions_on_shared_devices_ge3": 0
+    },
+    "common_receivers": {
+        "max_senders_per_beneficiary": 736,
+        "p90_senders_per_beneficiary": 664.0,
+        "p95_senders_per_beneficiary": 676.0,
+        "p99_senders_per_beneficiary": 695.0,
+        "transactions_to_common_receivers_ge3": 982018
+    }
+}

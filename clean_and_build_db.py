@@ -4,8 +4,12 @@ import sqlite3
 from openpyxl import load_workbook
 
 # Paths
-DATA_DIR = "/home/hoang/python/gcontest/data"
-EXCEL_FILE = os.path.join(DATA_DIR, "0.Data Guidline.xlsx")
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "data"))
+RAW_DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+os.makedirs(DATA_DIR, exist_ok=True)
+EXCEL_FILE = os.path.join(RAW_DATA_DIR, "0.Data Guidline (1).xlsx")
+if not os.path.exists(EXCEL_FILE):
+    EXCEL_FILE = os.path.join(RAW_DATA_DIR, "0.Data Guidline.xlsx")
 DB_FILE = os.path.join(DATA_DIR, "gcontest.db")
 
 # Sheet to CSV file mapping
@@ -159,7 +163,7 @@ def clean_legends():
     return True
 
 def process_and_load_table(table_name, csv_filename, conn):
-    csv_path = os.path.join(DATA_DIR, csv_filename)
+    csv_path = os.path.join(RAW_DATA_DIR, csv_filename)
     if not os.path.exists(csv_path):
         print(f"Error: {csv_path} does not exist.")
         return
@@ -174,7 +178,7 @@ def process_and_load_table(table_name, csv_filename, conn):
             print(f"Error: {csv_filename} is empty.")
             return
             
-        headers = [h.strip() for h in headers]
+        headers = [h.strip() if h.strip() else f"col_{idx}" for idx, h in enumerate(headers)]
         
         # Build column types for schema definition
         col_types = []
@@ -190,7 +194,7 @@ def process_and_load_table(table_name, csv_filename, conn):
                 t = "REAL"
             else:
                 t = "TEXT"
-            col_types.append(f"{h} {t}")
+            col_types.append(f'"{h}" {t}')
             
         cursor = conn.cursor()
         cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
@@ -198,7 +202,8 @@ def process_and_load_table(table_name, csv_filename, conn):
         
         # Insert query template
         placeholders = ', '.join(['?'] * len(headers))
-        insert_query = f"INSERT INTO {table_name} ({', '.join(headers)}) VALUES ({placeholders})"
+        quoted_headers = [f'"{h}"' for h in headers]
+        insert_query = f"INSERT INTO {table_name} ({', '.join(quoted_headers)}) VALUES ({placeholders})"
         
         batch = []
         batch_size = 50000

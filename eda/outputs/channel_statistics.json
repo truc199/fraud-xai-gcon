@@ -1,0 +1,10 @@
+{
+    "security_events": {
+        "total_security_events_found": 111835,
+        "total_ato_alerts": 14172
+    },
+    "login_channel_drift": {
+        "total_logins_found": 4660512,
+        "total_login_drift_alerts": 2364
+    }
+}

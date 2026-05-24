@@ -1,0 +1,19 @@
+{
+    "early_lifecycle": {
+        "total_new_account_transactions": 27352,
+        "early_abuse_alerts": 2357
+    },
+    "demographics": {
+        "age_extreme_alerts": 394,
+        "low_income_high_value_alerts": 3463,
+        "occupation_p99_thresholds": {
+            "BUSINESSMAN": 159444000.00000024,
+            "COMMERCIAL ASSOCIATE": 188000000.0,
+            "PENSIONER": 495079999.9999981,
+            "STATE SERVANT": 140123999.99999908,
+            "STUDENT": 257551349.99999997,
+            "UNEMPLOYED": 149692566.1999992,
+            "WORKING": 161500000.0
+        }
+    }
+}
