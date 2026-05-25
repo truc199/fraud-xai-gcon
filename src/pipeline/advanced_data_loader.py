@@ -54,6 +54,7 @@ class AdvancedDataLoader(DataLoader):
         query = """
             WITH trans_time_added AS (
                 SELECT 
+                    t.col_0 as TRANSACTION_ID,
                     t.CUSTOMER_NUMBER,
                     t.TRANS_LV1,
                     t.TRANS_LV2,
@@ -70,6 +71,7 @@ class AdvancedDataLoader(DataLoader):
             ),
             rolling_metrics AS (
                 SELECT 
+                    TRANSACTION_ID,
                     CUSTOMER_NUMBER,
                     TRANS_LV1,
                     TRANS_LV2,
@@ -153,6 +155,7 @@ class AdvancedDataLoader(DataLoader):
                 FROM Data_Transaction GROUP BY CUSTOMER_NUMBER
             )
             SELECT 
+                r.TRANSACTION_ID,
                 r.CUSTOMER_NUMBER,
                 r.TRANS_LV1,
                 r.TRANS_LV2,
@@ -314,6 +317,9 @@ class AdvancedDataLoader(DataLoader):
         
         # Drop temporary columns
         df = df.drop(columns=['tx_id', 'LAST_SEC_EVENT_TS', 'ts_dt'], errors='ignore')
+        if 'TRANSACTION_ID' in df.columns:
+            df['TRANSACTION_ID'] = df['TRANSACTION_ID'].astype(str)
+            df = df.set_index('TRANSACTION_ID', drop=False)
         return df
 
     def stream_batches(self, batch_size: int = 1000) -> Generator[pd.DataFrame, None, None]:

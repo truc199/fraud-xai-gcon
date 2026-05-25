@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     let allRuns = [];
     let activeRunId = null;
-    let confirmedCustomers = [];
+    let confirmedTransactions = [];
 
     // DOM Cache
     const runBtn = document.getElementById("runBtn");
@@ -19,11 +19,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const metricExplainer = document.getElementById("metricExplainer");
     const alertsGrid = document.getElementById("alertsGrid");
 
-    function fetchConfirmedCustomers() {
+    function fetchConfirmedTransactions() {
         return fetch("/api/confirmed_frauds")
             .then(res => res.json())
             .then(data => {
-                confirmedCustomers = data.confirmed_customers || [];
+                confirmedTransactions = data.confirmed_transactions || [];
             })
             .catch(err => {
                 console.error("Failed to load confirmed frauds:", err);
@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Load history on startup
-    fetchConfirmedCustomers().then(() => {
+    fetchConfirmedTransactions().then(() => {
         fetchHistory();
     });
 
@@ -219,9 +219,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span style="font-size: 13px; color: var(--color-text-muted); margin-left: 10px;">Score: ${score}</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 16px;">
-                        <button class="confirm-fraud-btn ${confirmedCustomers.includes(customerId) ? 'confirmed' : ''}" data-customer="${customerId}" title="Confirm Fraud">
+                        <button class="confirm-fraud-btn ${confirmedTransactions.includes(row.TRANSACTION_ID) ? 'confirmed' : ''}" data-transaction="${row.TRANSACTION_ID}" title="Confirm Fraud">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                            <span>${confirmedCustomers.includes(customerId) ? 'Confirmed' : 'Confirm Fraud'}</span>
+                            <span>${confirmedTransactions.includes(row.TRANSACTION_ID) ? 'Confirmed' : 'Confirm Fraud'}</span>
                         </button>
                         <button class="copy-card-btn" title="Copy Alert Summary">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -284,21 +284,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const confirmBtn = card.querySelector(".confirm-fraud-btn");
             if (confirmBtn) {
                 confirmBtn.addEventListener("click", () => {
-                    const custNum = confirmBtn.getAttribute("data-customer");
-                    if (!custNum) return;
+                    const txId = confirmBtn.getAttribute("data-transaction");
+                    if (!txId) return;
                     
                     fetch("/api/confirm_fraud", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
                         },
-                        body: JSON.stringify({ customer_number: custNum })
+                        body: JSON.stringify({ transaction_id: txId })
                     })
                     .then(res => res.json())
                     .then(data => {
                         if (data.status === "success") {
-                            if (!confirmedCustomers.includes(custNum)) {
-                                confirmedCustomers.push(custNum);
+                            if (!confirmedTransactions.includes(txId)) {
+                                confirmedTransactions.push(txId);
                             }
                             confirmBtn.classList.add("confirmed");
                             confirmBtn.querySelector("span").textContent = "Confirmed";

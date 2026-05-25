@@ -87,23 +87,23 @@ def main():
     
     # 3. Train on a memory-safe subset of 50,000 records
     print("\n--- Phase 1: Training ---")
-    confirmed_customers = set()
+    confirmed_transactions = set()
     fraud_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "confirmed_frauds.json"))
     if os.path.exists(fraud_file):
         try:
             with open(fraud_file, "r") as f:
                 data = json.load(f)
-                confirmed_customers = set(str(c).strip() for c in data.get("confirmed_customers", []))
+                confirmed_transactions = set(str(c).strip() for c in data.get("confirmed_transactions", []))
         except Exception as e:
             print(f"Warning: Failed to load confirmed frauds: {e}")
             
     df_train = data_loader.load_training_data(limit=50000)
     y = pd.Series(0, index=df_train.index)
-    if confirmed_customers:
-        y[df_train['CUSTOMER_NUMBER'].astype(str).str.strip().isin(confirmed_customers)] = 1
-        print(f"Loaded {len(confirmed_customers)} confirmed fraud customers. Flagged {y.sum()} transactions in training set.")
+    if confirmed_transactions:
+        y.loc[y.index.isin(confirmed_transactions)] = 1
+        print(f"Loaded {len(confirmed_transactions)} confirmed fraud transactions. Flagged {y.sum()} transactions in training set.")
     else:
-        print("No confirmed fraud customers loaded for training.")
+        print("No confirmed fraud transactions loaded for training.")
         
     pipeline.run_training_pipeline(limit=50000, y=y)
     
@@ -185,7 +185,7 @@ def main():
     df_export['COUNTERFACTUAL'] = [cf_map.get(i, "") for i in range(len(df_export))]
     
     # Reorder columns for visibility and filter to anomalies only
-    key_cols = ['CUSTOMER_NUMBER', 'ANOMALY_PRED', 'ANOMALY_SCORE', 'EXPLANATION', 'TOP_SHAP_CONTRIBUTORS', 'TOP_INTERACTIONS', 'COUNTERFACTUAL']
+    key_cols = ['TRANSACTION_ID', 'CUSTOMER_NUMBER', 'ANOMALY_PRED', 'ANOMALY_SCORE', 'EXPLANATION', 'TOP_SHAP_CONTRIBUTORS', 'TOP_INTERACTIONS', 'COUNTERFACTUAL']
     other_cols = [c for c in df_export.columns if c not in key_cols]
     df_export = df_export[key_cols + other_cols]
     df_export = df_export[df_export['ANOMALY_PRED'] == 1].reset_index(drop=True)

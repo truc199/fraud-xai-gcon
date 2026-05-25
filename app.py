@@ -115,15 +115,15 @@ async def get_confirmed_frauds():
                 return json.load(f)
         except Exception:
             pass
-    return {"confirmed_customers": []}
+    return {"confirmed_transactions": []}
 
 class ConfirmFraudRequest(BaseModel):
-    customer_number: str
+    transaction_id: str
 
 @app.post("/api/confirm_fraud")
 async def confirm_fraud(req: ConfirmFraudRequest):
     fraud_file = "data/confirmed_frauds.json"
-    data = {"confirmed_customers": []}
+    data = {"confirmed_transactions": []}
     if os.path.exists(fraud_file):
         try:
             with open(fraud_file, "r") as f:
@@ -131,13 +131,13 @@ async def confirm_fraud(req: ConfirmFraudRequest):
         except Exception:
             pass
             
-    if "confirmed_customers" not in data:
-        data["confirmed_customers"] = []
+    if "confirmed_transactions" not in data:
+        data["confirmed_transactions"] = []
         
-    cust = str(req.customer_number).strip()
-    if cust and cust not in data["confirmed_customers"]:
-        data["confirmed_customers"].append(cust)
+    tx_id = str(req.transaction_id).strip()
+    if tx_id and tx_id not in data["confirmed_transactions"]:
+        data["confirmed_transactions"].append(tx_id)
         with open(fraud_file, "w") as f:
             json.dump(data, f, indent=4)
             
-    return {"status": "success", "confirmed_customers": data["confirmed_customers"]}
+    return {"status": "success", "confirmed_transactions": data["confirmed_transactions"]}
