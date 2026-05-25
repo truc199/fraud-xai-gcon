@@ -2,10 +2,10 @@ import time
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
-from src.pipeline.advanced_hierarchical_orchestrator import AdvancedHierarchicalMLPipeline
+from src.pipeline.orchestrator import MLPipeline
 from src.pipeline.protocols import DataLoader, FeaturePreprocessor, ModelAgent, xAIExplainer, PipelinePlugin, RoutingRule
 
-class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
+class CustomHierarchicalMLPipeline(MLPipeline):
     """Custom hierarchical orchestrator that integrates CustomBRACEExplainer by passing
     the intermediate ambiguous transaction records for causal recourse tracking.
     """
@@ -16,10 +16,6 @@ class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
         model_agent: ModelAgent,
         explainer: Optional[xAIExplainer] = None,
         plugins: Optional[List[PipelinePlugin]] = None,
-        tier1_rarity_threshold: float = -1.0,
-        tier1_amount_threshold: float = 500000.0,
-        tier1_count_1h_threshold: float = 1.0,
-        tier1_count_24h_threshold: float = 2.0,
         rules: Optional[List[RoutingRule]] = None
     ):
         super().__init__(
@@ -27,11 +23,7 @@ class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
             preprocessor=preprocessor,
             model_agent=model_agent,
             explainer=explainer,
-            plugins=plugins,
-            tier1_rarity_threshold=tier1_rarity_threshold,
-            tier1_amount_threshold=tier1_amount_threshold,
-            tier1_count_1h_threshold=tier1_count_1h_threshold,
-            tier1_count_24h_threshold=tier1_count_24h_threshold
+            plugins=plugins
         )
         self.rules = rules or []
 

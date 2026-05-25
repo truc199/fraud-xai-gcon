@@ -82,10 +82,6 @@ def main():
         model_agent=model_agent,
         explainer=explainer,
         plugins=plugins,
-        tier1_rarity_threshold=-1.0,
-        tier1_amount_threshold=500000.0,
-        tier1_count_1h_threshold=1.0,
-        tier1_count_24h_threshold=2.0,
         rules=rules
     )
     
