@@ -5,11 +5,8 @@ from openpyxl import load_workbook
 
 # Paths
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "data"))
-RAW_DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 os.makedirs(DATA_DIR, exist_ok=True)
-EXCEL_FILE = os.path.join(RAW_DATA_DIR, "0.Data Guidline (1).xlsx")
-if not os.path.exists(EXCEL_FILE):
-    EXCEL_FILE = os.path.join(RAW_DATA_DIR, "0.Data Guidline.xlsx")
+EXCEL_FILE = os.path.join(DATA_DIR, "0.Data Guidline.xlsx")
 DB_FILE = os.path.join(DATA_DIR, "gcontest.db")
 
 # Sheet to CSV file mapping
@@ -163,7 +160,7 @@ def clean_legends():
     return True
 
 def process_and_load_table(table_name, csv_filename, conn):
-    csv_path = os.path.join(RAW_DATA_DIR, csv_filename)
+    csv_path = os.path.join(DATA_DIR, csv_filename)
     if not os.path.exists(csv_path):
         print(f"Error: {csv_path} does not exist.")
         return

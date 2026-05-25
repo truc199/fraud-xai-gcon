@@ -13,9 +13,11 @@ from src.pipeline.custom_orchestrator import CustomHierarchicalMLPipeline
 from src.pipeline.nnpu_c_classifier import NNPUCModelAgent
 from src.pipeline.ewc_model_agent import EWCModelAgent
 from src.pipeline.plugins import ConsoleLoggerPlugin, MetricsTrackerPlugin
+from src.pipeline.rules import SequenceRarityRule, VelocityBypassRule
 
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "gcontest.db"))
+
 
 def resolve_filename(directory: str, base_name: str, ext: str) -> str:
     if base_name.endswith(ext):
@@ -70,21 +72,40 @@ def main():
     plugins = [ConsoleLoggerPlugin(), MetricsTrackerPlugin()]
     
     # 2. Assemble the Pipeline (Hierarchical Fallback Routing - Option B)
+    rules = [
+        SequenceRarityRule(rarity_threshold=-1.0, amount_threshold=500000.0),
+        VelocityBypassRule(amount_threshold=500000.0, count_1h_threshold=1.0, count_24h_threshold=2.0)
+    ]
     pipeline = CustomHierarchicalMLPipeline(
         data_loader=data_loader,
         preprocessor=preprocessor,
         model_agent=model_agent,
         explainer=explainer,
         plugins=plugins,
-        tier1_rarity_threshold=-1.0,
-        tier1_amount_threshold=500000.0,
-        tier1_count_1h_threshold=1.0,
-        tier1_count_24h_threshold=2.0
+        rules=rules
     )
     
     # 3. Train on a memory-safe subset of 50,000 records
     print("\n--- Phase 1: Training ---")
-    pipeline.run_training_pipeline(limit=50000)
+    confirmed_transactions = set()
+    fraud_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "confirmed_frauds.json"))
+    if os.path.exists(fraud_file):
+        try:
+            with open(fraud_file, "r") as f:
+                data = json.load(f)
+                confirmed_transactions = set(str(c).strip() for c in data.get("confirmed_transactions", []))
+        except Exception as e:
+            print(f"Warning: Failed to load confirmed frauds: {e}")
+            
+    df_train = data_loader.load_training_data(limit=50000)
+    y = pd.Series(0, index=df_train.index)
+    if confirmed_transactions:
+        y.loc[y.index.isin(confirmed_transactions)] = 1
+        print(f"Loaded {len(confirmed_transactions)} confirmed fraud transactions. Flagged {y.sum()} transactions in training set.")
+    else:
+        print("No confirmed fraud transactions loaded for training.")
+        
+    pipeline.run_training_pipeline(limit=50000, y=y)
     
     # 4. Fetch test batch (5,000 records) for inference and explanation
     print("\n--- Phase 2: Inference & xAI Generation ---")
@@ -164,7 +185,7 @@ def main():
     df_export['COUNTERFACTUAL'] = [cf_map.get(i, "") for i in range(len(df_export))]
     
     # Reorder columns for visibility and filter to anomalies only
-    key_cols = ['CUSTOMER_NUMBER', 'ANOMALY_PRED', 'ANOMALY_SCORE', 'EXPLANATION', 'TOP_SHAP_CONTRIBUTORS', 'TOP_INTERACTIONS', 'COUNTERFACTUAL']
+    key_cols = ['TRANSACTION_ID', 'CUSTOMER_NUMBER', 'ANOMALY_PRED', 'ANOMALY_SCORE', 'EXPLANATION', 'TOP_SHAP_CONTRIBUTORS', 'TOP_INTERACTIONS', 'COUNTERFACTUAL']
     other_cols = [c for c in df_export.columns if c not in key_cols]
     df_export = df_export[key_cols + other_cols]
     df_export = df_export[df_export['ANOMALY_PRED'] == 1].reset_index(drop=True)
@@ -202,6 +223,9 @@ def main():
             "total_records_evaluated": len(df_test)
         }
     }
+    
+    if hasattr(pipeline, "get_rules_descriptions"):
+        metadata["rules"] = pipeline.get_rules_descriptions()
     
     with open(json_latest, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=4)

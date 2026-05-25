@@ -6,6 +6,7 @@ from typing import Generator
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 app = FastAPI(title="Advanced Cohort Fraud xAI Dashboard")
 
@@ -104,3 +105,39 @@ def stream_pipeline_run() -> StreamingResponse:
         yield f"data: [SERVER] Pipeline execution completed with code {return_code}\n\n"
         
     return StreamingResponse(run_generator(), media_type="text/event-stream")
+
+@app.get("/api/confirmed_frauds")
+async def get_confirmed_frauds():
+    fraud_file = "data/confirmed_frauds.json"
+    if os.path.exists(fraud_file):
+        try:
+            with open(fraud_file, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"confirmed_transactions": []}
+
+class ConfirmFraudRequest(BaseModel):
+    transaction_id: str
+
+@app.post("/api/confirm_fraud")
+async def confirm_fraud(req: ConfirmFraudRequest):
+    fraud_file = "data/confirmed_frauds.json"
+    data = {"confirmed_transactions": []}
+    if os.path.exists(fraud_file):
+        try:
+            with open(fraud_file, "r") as f:
+                data = json.load(f)
+        except Exception:
+            pass
+            
+    if "confirmed_transactions" not in data:
+        data["confirmed_transactions"] = []
+        
+    tx_id = str(req.transaction_id).strip()
+    if tx_id and tx_id not in data["confirmed_transactions"]:
+        data["confirmed_transactions"].append(tx_id)
+        with open(fraud_file, "w") as f:
+            json.dump(data, f, indent=4)
+            
+    return {"status": "success", "confirmed_transactions": data["confirmed_transactions"]}

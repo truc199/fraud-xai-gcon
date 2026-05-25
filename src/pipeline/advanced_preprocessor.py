@@ -2,8 +2,9 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from typing import Dict
+from src.pipeline.protocols import FeaturePreprocessor
 
-class AdvancedPreprocessor:
+class AdvancedPreprocessor(FeaturePreprocessor):
     """Preprocesses columns and engineers advanced domain-specific fraud features (Z-scores, rolling velocities, Benford, Markov)."""
     def __init__(self):
         self.categorical_cols = [

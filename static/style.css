@@ -530,6 +530,37 @@ body.dark-theme {
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
 }
 
+.confirm-fraud-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--color-text-main);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.confirm-fraud-btn:hover {
+    background: rgba(244, 63, 94, 0.15);
+    border-color: var(--color-accent-red);
+    color: var(--color-accent-red);
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.2);
+}
+
+.confirm-fraud-btn.confirmed {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--color-accent-green);
+    color: var(--color-accent-green);
+    cursor: default;
+    pointer-events: none;
+}
+
 /* Keyframes Animations */
 @keyframes pulseGlow {
     0%, 100% {

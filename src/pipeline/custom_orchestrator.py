@@ -2,10 +2,10 @@ import time
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
-from src.pipeline.advanced_hierarchical_orchestrator import AdvancedHierarchicalMLPipeline
-from src.pipeline.protocols import DataLoader, FeaturePreprocessor, ModelAgent, xAIExplainer, PipelinePlugin
+from src.pipeline.orchestrator import MLPipeline
+from src.pipeline.protocols import DataLoader, FeaturePreprocessor, ModelAgent, xAIExplainer, PipelinePlugin, RoutingRule
 
-class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
+class CustomHierarchicalMLPipeline(MLPipeline):
     """Custom hierarchical orchestrator that integrates CustomBRACEExplainer by passing
     the intermediate ambiguous transaction records for causal recourse tracking.
     """
@@ -16,22 +16,16 @@ class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
         model_agent: ModelAgent,
         explainer: Optional[xAIExplainer] = None,
         plugins: Optional[List[PipelinePlugin]] = None,
-        tier1_rarity_threshold: float = -1.0,
-        tier1_amount_threshold: float = 500000.0,
-        tier1_count_1h_threshold: float = 1.0,
-        tier1_count_24h_threshold: float = 2.0
+        rules: Optional[List[RoutingRule]] = None
     ):
         super().__init__(
             data_loader=data_loader,
             preprocessor=preprocessor,
             model_agent=model_agent,
             explainer=explainer,
-            plugins=plugins,
-            tier1_rarity_threshold=tier1_rarity_threshold,
-            tier1_amount_threshold=tier1_amount_threshold,
-            tier1_count_1h_threshold=tier1_count_1h_threshold,
-            tier1_count_24h_threshold=tier1_count_24h_threshold
+            plugins=plugins
         )
+        self.rules = rules or []
 
     def run_inference_pipeline(self, df_raw: pd.DataFrame, explain_limit: int = 1000) -> Dict[str, Any]:
         """Perform hierarchical routed prediction and explanation with custom explainer data mapping."""
@@ -41,29 +35,30 @@ class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
         n_total = len(df_raw)
         start_total = time.time()
         
-        # 1. Tier 1: High-Speed Vigilance with Velocity Bypass
+        # 1. Tier 1: Pluggable Rules Bypass (Safe & Fraud)
         start_t1 = time.time()
         
-        rarity_scores = pd.to_numeric(df_raw.get('ACTIVITY_SEQ_RARITY', 0.0)).fillna(0.0).values
-        amounts = pd.to_numeric(df_raw.get('TRANS_AMOUNT', 0.0)).fillna(0.0).values
-        count_1h = pd.to_numeric(df_raw.get('COUNT_1H', 1.0)).fillna(1.0).values
-        count_24h = pd.to_numeric(df_raw.get('COUNT_24H', 1.0)).fillna(1.0).values
-        
-        seq_amount_safe = (rarity_scores > self.tier1_rarity_threshold) & (amounts < self.tier1_amount_threshold)
-        velocity_safe = (amounts < self.tier1_amount_threshold) & \
-                        (count_1h <= self.tier1_count_1h_threshold) & \
-                        (count_24h <= self.tier1_count_24h_threshold)
-                        
-        is_safe = seq_amount_safe | velocity_safe
-        
-        n_safe = int(np.sum(is_safe))
-        n_ambiguous = n_total - n_safe
+        decisions = np.full(n_total, -1, dtype=int)
+        for rule in self.rules:
+            rule_decisions = rule.evaluate(df_raw)
+            # Safe (0) overrides ambiguous (-1)
+            decisions = np.where((decisions == -1) & (rule_decisions == 0), 0, decisions)
+            # Fraud (1) overrides all
+            decisions = np.where(rule_decisions == 1, 1, decisions)
+            
+        n_safe = int(np.sum(decisions == 0))
+        n_forced_fraud = int(np.sum(decisions == 1))
+        n_ambiguous = n_total - n_safe - n_forced_fraud
         t1_duration = time.time() - start_t1
         
         y_pred = np.zeros(n_total, dtype=int)
         y_prob = np.zeros(n_total, dtype=float)
         
-        ambiguous_indices = np.where(~is_safe)[0]
+        # Pre-fill bypass decisions
+        y_pred[decisions == 1] = 1
+        y_prob[decisions == 1] = 1.0
+        
+        ambiguous_indices = np.where(decisions == -1)[0]
         
         explanations = []
         n_flagged = 0
@@ -115,7 +110,8 @@ class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
         self.last_run_stats = {
             "total_records": n_total,
             "tier1_filtered_safe": n_safe,
-            "tier1_filter_pct": (n_safe / n_total) * 100 if n_total > 0 else 0,
+            "tier1_forced_fraud": n_forced_fraud,
+            "tier1_filter_pct": ((n_safe + n_forced_fraud) / n_total) * 100 if n_total > 0 else 0,
             "tier2_evaluated": n_ambiguous,
             "tier3_flagged_anomalies": n_flagged,
             "tier1_time_sec": t1_duration,
@@ -127,7 +123,8 @@ class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
         # Console output for routing audit
         print("\n=== Hierarchical Routing Execution Stats ===")
         print(f"  Total Telemetry Evaluated : {n_total:,}")
-        print(f"  Tier 1 Filtered (Safe)     : {n_safe:,} ({self.last_run_stats['tier1_filter_pct']:.1f}%)")
+        print(f"  Tier 1 Filtered (Safe)     : {n_safe:,}")
+        print(f"  Tier 1 Forced (Fraud)      : {n_forced_fraud:,}")
         print(f"  Tier 2 Processed (Ambiguous): {n_ambiguous:,}")
         print(f"  Tier 3 Explanations (Alerts): {n_flagged:,}")
         print(f"  Execution Time breakdown:")
@@ -144,3 +141,7 @@ class CustomHierarchicalMLPipeline(AdvancedHierarchicalMLPipeline):
             'probabilities': y_prob,
             'explanations': explanations
         }
+
+    def get_rules_descriptions(self) -> List[str]:
+        """Return a list of rule descriptions in natural language."""
+        return [rule.to_natural_language() for rule in self.rules]

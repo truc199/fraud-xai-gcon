@@ -4,6 +4,7 @@ import pandas as pd
 import math
 from collections import defaultdict
 from typing import Optional, Generator, Dict
+from src.pipeline.protocols import DataLoader
 
 def calculate_second_order_markov_mapping(conn: sqlite3.Connection) -> Dict[int, float]:
     """Calculate second-order Markov Chain log-likelihood (with backoff & interpolation) per customer."""
@@ -128,7 +129,7 @@ def calculate_benford_mapping(conn: sqlite3.Connection) -> Dict[int, float]:
         
     return mapping
 
-class SecondOrderMarkovDataLoader:
+class SecondOrderMarkovDataLoader(DataLoader):
     """DataLoader that aggregates transactional and profile features, extracting second-order activity sequence rarity."""
     def __init__(self, db_path: str):
         self.db_path = db_path

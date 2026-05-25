@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from typing import Optional, Any, Dict
+from src.pipeline.protocols import ModelAgent
 
 class PyTorchAutoencoder(nn.Module):
     """PyTorch Autoencoder for calculating reconstruction loss anomalies."""
@@ -24,7 +25,7 @@ class PyTorchAutoencoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
 
-class EWCModelAgent:
+class EWCModelAgent(ModelAgent):
     """ModelAgent wrapping a PyTorch Autoencoder with Elastic Weight Consolidation (EWC) continuous learning capability."""
     def __init__(self, contamination: float = 0.03, random_state: int = 42):
         self.contamination = contamination

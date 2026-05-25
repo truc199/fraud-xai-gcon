@@ -5,6 +5,7 @@ import numpy as np
 import math
 from collections import defaultdict
 from typing import Optional, Generator, Dict
+from src.pipeline.protocols import DataLoader
 from src.pipeline.second_order_markov_loader import calculate_second_order_markov_mapping, calculate_benford_mapping
 
 def compute_rolling_unique_beneficiaries(df):
@@ -39,7 +40,7 @@ def compute_rolling_unique_beneficiaries(df):
             
     return unique_counts
 
-class AdvancedDataLoader:
+class AdvancedDataLoader(DataLoader):
     """DataLoader that extracts transactional data aggregated with multi-window rollings,
     activity changes, and login channel drift statistics.
     """
@@ -53,6 +54,7 @@ class AdvancedDataLoader:
         query = """
             WITH trans_time_added AS (
                 SELECT 
+                    t.col_0 as TRANSACTION_ID,
                     t.CUSTOMER_NUMBER,
                     t.TRANS_LV1,
                     t.TRANS_LV2,
@@ -69,6 +71,7 @@ class AdvancedDataLoader:
             ),
             rolling_metrics AS (
                 SELECT 
+                    TRANSACTION_ID,
                     CUSTOMER_NUMBER,
                     TRANS_LV1,
                     TRANS_LV2,
@@ -152,6 +155,7 @@ class AdvancedDataLoader:
                 FROM Data_Transaction GROUP BY CUSTOMER_NUMBER
             )
             SELECT 
+                r.TRANSACTION_ID,
                 r.CUSTOMER_NUMBER,
                 r.TRANS_LV1,
                 r.TRANS_LV2,
@@ -313,6 +317,9 @@ class AdvancedDataLoader:
         
         # Drop temporary columns
         df = df.drop(columns=['tx_id', 'LAST_SEC_EVENT_TS', 'ts_dt'], errors='ignore')
+        if 'TRANSACTION_ID' in df.columns:
+            df['TRANSACTION_ID'] = df['TRANSACTION_ID'].astype(str)
+            df = df.set_index('TRANSACTION_ID', drop=False)
         return df
 
     def stream_batches(self, batch_size: int = 1000) -> Generator[pd.DataFrame, None, None]:

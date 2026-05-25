@@ -4,6 +4,7 @@ import pandas as pd
 import math
 from collections import defaultdict
 from typing import Optional, Generator, Dict
+from src.pipeline.protocols import DataLoader
 
 def calculate_benford_mapping(conn: sqlite3.Connection) -> Dict[int, float]:
     """Calculate KL-Divergence of transaction amount leading digits vs Benford's Law per customer."""
@@ -103,7 +104,7 @@ def calculate_activity_seq_mapping(conn: sqlite3.Connection) -> Dict[int, float]
         
     return mapping
 
-class SQLiteDataLoader:
+class SQLiteDataLoader(DataLoader):
     """DataLoader that extracts transactional data aggregated with rolling windows, Benford, and Markov sequence metrics."""
     def __init__(self, db_path: str):
         self.db_path = db_path

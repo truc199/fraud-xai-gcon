@@ -1,5 +1,6 @@
 data/*
 !data/exports/
+!data/confirmed_frauds.json
 
 .gemini/
 .venv/

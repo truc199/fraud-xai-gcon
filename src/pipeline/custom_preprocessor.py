@@ -2,8 +2,9 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from typing import Dict
+from src.pipeline.protocols import FeaturePreprocessor
 
-class CustomPreprocessor:
+class CustomPreprocessor(FeaturePreprocessor):
     """Preprocesses columns and engineers custom features with specific removals, mixes,
     age categorization, and stable interaction features.
     """
