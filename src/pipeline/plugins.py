@@ -1,8 +1,9 @@
 from typing import Any, List, Dict
+from src.pipeline.protocols import PipelinePlugin
 import pandas as pd
 import numpy as np
 
-class ConsoleLoggerPlugin:
+class ConsoleLoggerPlugin(PipelinePlugin):
     """Plugin to print logs at each step of the pipeline lifecycle."""
     def on_pipeline_start(self, pipeline: Any) -> None:
         print("[Pipeline] Execution initialized.")
@@ -24,7 +25,7 @@ class ConsoleLoggerPlugin:
     def on_pipeline_end(self, pipeline: Any) -> None:
         print("[Pipeline] Execution completed successfully.")
 
-class MetricsTrackerPlugin:
+class MetricsTrackerPlugin(PipelinePlugin):
     """Plugin to collect and display runtime statistics."""
     def __init__(self):
         self.metrics: Dict[str, Any] = {}

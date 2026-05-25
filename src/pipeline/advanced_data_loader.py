@@ -5,6 +5,7 @@ import numpy as np
 import math
 from collections import defaultdict
 from typing import Optional, Generator, Dict
+from src.pipeline.protocols import DataLoader
 from src.pipeline.second_order_markov_loader import calculate_second_order_markov_mapping, calculate_benford_mapping
 
 def compute_rolling_unique_beneficiaries(df):
@@ -39,7 +40,7 @@ def compute_rolling_unique_beneficiaries(df):
             
     return unique_counts
 
-class AdvancedDataLoader:
+class AdvancedDataLoader(DataLoader):
     """DataLoader that extracts transactional data aggregated with multi-window rollings,
     activity changes, and login channel drift statistics.
     """

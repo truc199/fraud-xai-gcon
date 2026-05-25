@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 from typing import Optional, Any
+from src.pipeline.protocols import ModelAgent
 
-class CorrelationDiscrepancyModelAgent:
+class CorrelationDiscrepancyModelAgent(ModelAgent):
     """Pluggable ModelAgent implementing Option C (CONDOR).
     Measures the Frobenius norm of the discrepancy between rolling correlation matrices 
     and the baseline historical correlation matrix to detect structural relationship anomalies.

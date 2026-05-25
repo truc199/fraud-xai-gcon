@@ -1,4 +1,5 @@
 from typing import Optional, Any, Dict
+from src.pipeline.protocols import ModelAgent
 import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
@@ -8,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-class IsolationForestModelAgent:
+class IsolationForestModelAgent(ModelAgent):
     """Unsupervised anomaly detection agent using scikit-learn's Isolation Forest."""
     def __init__(self, contamination: float = 0.01, random_state: int = 42):
         self.contamination = contamination
@@ -21,26 +22,32 @@ class IsolationForestModelAgent:
         self.is_trained = False
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> None:
-        self.model.fit(X)
+        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
+        numerical_cols = [col for col in X.columns if col not in categorical_cols]
+        self.model.fit(X[numerical_cols])
         self.is_trained = True
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if not self.is_trained:
             raise ValueError("Model has not been trained yet.")
-        preds = self.model.predict(X)
+        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
+        numerical_cols = [col for col in X.columns if col not in categorical_cols]
+        preds = self.model.predict(X[numerical_cols])
         return np.where(preds == -1, 1, 0)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         if not self.is_trained:
             raise ValueError("Model has not been trained yet.")
-        scores = self.model.score_samples(X)
+        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
+        numerical_cols = [col for col in X.columns if col not in categorical_cols]
+        scores = self.model.score_samples(X[numerical_cols])
         probs = np.clip(-scores, 0.0, 1.0)
         return probs
 
     def get_raw_model(self) -> Any:
         return self.model
 
-class XGBoostModelAgent:
+class XGBoostModelAgent(ModelAgent):
     """Supervised classification agent using XGBoost Classifier."""
     def __init__(self, n_estimators: int = 100, max_depth: int = 5, random_state: int = 42):
         self.n_estimators = n_estimators
@@ -93,7 +100,7 @@ class PyTorchAutoencoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
 
-class CohortAnomalyModelAgent:
+class CohortAnomalyModelAgent(ModelAgent):
     """Advanced hybrid anomaly agent blending GMM soft-cohort Isolation Forests and PyTorch Autoencoder MSE loss,
     and training a Positive-Unlabeled (PU) XGBoost classifier on top ensemble anomaly predictions."""
     def __init__(self, n_cohorts: int = 3, contamination: float = 0.01, random_state: int = 42):
@@ -197,13 +204,15 @@ class CohortAnomalyModelAgent:
         self.cohort_models = {}
         for c_idx in range(self.n_cohorts):
             X_cohort = X_w_cohort[X_w_cohort['cohort'] == c_idx].drop(columns=['cohort'])
+            categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
+            numerical_cols = [col for col in X_cohort.columns if col not in categorical_cols]
             model = IsolationForest(
                 contamination=self.contamination, 
                 random_state=self.random_state, 
                 n_jobs=-1
             )
             if len(X_cohort) > 10:
-                model.fit(X_cohort)
+                model.fit(X_cohort[numerical_cols])
             self.cohort_models[c_idx] = model
             
         # 3. Train Autoencoder
@@ -265,9 +274,11 @@ class CohortAnomalyModelAgent:
         # Isolation Forest cohort scores
         n_samples = len(X)
         cohort_scores = np.zeros((n_samples, self.n_cohorts))
+        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
+        numerical_cols = [col for col in X.columns if col not in categorical_cols]
         for c_idx, model in self.cohort_models.items():
             if hasattr(model, 'estimators_'):
-                scores = model.score_samples(X)
+                scores = model.score_samples(X[numerical_cols])
                 cohort_scores[:, c_idx] = np.clip(-scores, 0.0, 1.0)
             else:
                 cohort_scores[:, c_idx] = 0.5

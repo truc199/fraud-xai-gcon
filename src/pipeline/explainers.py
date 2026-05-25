@@ -2,8 +2,9 @@ import shap
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List
+from src.pipeline.protocols import xAIExplainer
 
-class SHAPExplainer:
+class SHAPExplainer(xAIExplainer):
     """xAI Engine using SHAP to calculate and translate contribution scores into plain-language rationales."""
     def __init__(self, background_data_limit: int = 100):
         self.background_data_limit = background_data_limit

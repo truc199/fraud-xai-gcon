@@ -4,8 +4,9 @@ import xgboost as xgb
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import KFold
 from typing import Optional, Any
+from src.pipeline.protocols import ModelAgent
 
-class NNPUCModelAgent:
+class NNPUCModelAgent(ModelAgent):
     """Pluggable ModelAgent combining:
     - Option A: nnPU & PAYN Spy-Determined Thresholding (designed to go with XGBoost)
     - Option C: Rademacher Complexity Regularization & CV-based Unlabeled Optimization (CVuO)
@@ -41,13 +42,18 @@ class NNPUCModelAgent:
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> None:
         """Fit the model using PAYN Spy-filtering (Option A) and CVuO loss-filtering (Option C)."""
-        # 1. Bootstrap positive labels using an Isolation Forest proxy if no target labels are provided
-        if y is None:
-            iso = IsolationForest(contamination=self.contamination, random_state=self.random_state, n_jobs=-1)
-            raw_scores = iso.fit_predict(X)
-            s = np.where(raw_scores == -1, 1, 0)
+        # 1. Bootstrap positive labels using an Isolation Forest proxy, merged with y if available
+        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
+        numerical_cols = [col for col in X.columns if col not in categorical_cols]
+        iso = IsolationForest(contamination=self.contamination, random_state=self.random_state, n_jobs=-1)
+        raw_scores = iso.fit_predict(X[numerical_cols])
+        s_iso = np.where(raw_scores == -1, 1, 0)
+        
+        if y is not None:
+            # Union of known positives and unsupervised anomalies
+            s = np.where((s_iso == 1) | (np.asarray(y) == 1), 1, 0)
         else:
-            s = np.asarray(y)
+            s = s_iso
 
         P_indices = np.where(s == 1)[0]
         U_indices = np.where(s == 0)[0]
