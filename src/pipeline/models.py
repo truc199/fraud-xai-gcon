@@ -1,5 +1,5 @@
 from typing import Optional, Any, Dict
-from src.pipeline.protocols import ModelAgent
+from src.pipeline.protocols import ModelAgent, drop_categoricals
 import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
@@ -22,25 +22,19 @@ class IsolationForestModelAgent(ModelAgent):
         self.is_trained = False
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> None:
-        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
-        numerical_cols = [col for col in X.columns if col not in categorical_cols]
-        self.model.fit(X[numerical_cols])
+        self.model.fit(drop_categoricals(X))
         self.is_trained = True
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if not self.is_trained:
             raise ValueError("Model has not been trained yet.")
-        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
-        numerical_cols = [col for col in X.columns if col not in categorical_cols]
-        preds = self.model.predict(X[numerical_cols])
+        preds = self.model.predict(drop_categoricals(X))
         return np.where(preds == -1, 1, 0)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         if not self.is_trained:
             raise ValueError("Model has not been trained yet.")
-        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
-        numerical_cols = [col for col in X.columns if col not in categorical_cols]
-        scores = self.model.score_samples(X[numerical_cols])
+        scores = self.model.score_samples(drop_categoricals(X))
         probs = np.clip(-scores, 0.0, 1.0)
         return probs
 
@@ -204,15 +198,13 @@ class CohortAnomalyModelAgent(ModelAgent):
         self.cohort_models = {}
         for c_idx in range(self.n_cohorts):
             X_cohort = X_w_cohort[X_w_cohort['cohort'] == c_idx].drop(columns=['cohort'])
-            categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
-            numerical_cols = [col for col in X_cohort.columns if col not in categorical_cols]
             model = IsolationForest(
                 contamination=self.contamination, 
                 random_state=self.random_state, 
                 n_jobs=-1
             )
             if len(X_cohort) > 10:
-                model.fit(X_cohort[numerical_cols])
+                model.fit(drop_categoricals(X_cohort))
             self.cohort_models[c_idx] = model
             
         # 3. Train Autoencoder
@@ -274,11 +266,9 @@ class CohortAnomalyModelAgent(ModelAgent):
         # Isolation Forest cohort scores
         n_samples = len(X)
         cohort_scores = np.zeros((n_samples, self.n_cohorts))
-        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
-        numerical_cols = [col for col in X.columns if col not in categorical_cols]
         for c_idx, model in self.cohort_models.items():
             if hasattr(model, 'estimators_'):
-                scores = model.score_samples(X[numerical_cols])
+                scores = model.score_samples(drop_categoricals(X))
                 cohort_scores[:, c_idx] = np.clip(-scores, 0.0, 1.0)
             else:
                 cohort_scores[:, c_idx] = 0.5

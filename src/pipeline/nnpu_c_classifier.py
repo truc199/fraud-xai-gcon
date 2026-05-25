@@ -4,7 +4,7 @@ import xgboost as xgb
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import KFold
 from typing import Optional, Any
-from src.pipeline.protocols import ModelAgent
+from src.pipeline.protocols import ModelAgent, drop_categoricals
 
 class NNPUCModelAgent(ModelAgent):
     """Pluggable ModelAgent combining:
@@ -43,10 +43,8 @@ class NNPUCModelAgent(ModelAgent):
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> None:
         """Fit the model using PAYN Spy-filtering (Option A) and CVuO loss-filtering (Option C)."""
         # 1. Bootstrap positive labels using an Isolation Forest proxy, merged with y if available
-        categorical_cols = ['TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP']
-        numerical_cols = [col for col in X.columns if col not in categorical_cols]
         iso = IsolationForest(contamination=self.contamination, random_state=self.random_state, n_jobs=-1)
-        raw_scores = iso.fit_predict(X[numerical_cols])
+        raw_scores = iso.fit_predict(drop_categoricals(X))
         s_iso = np.where(raw_scores == -1, 1, 0)
         
         if y is not None:

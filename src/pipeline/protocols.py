@@ -65,3 +65,11 @@ class RoutingRule(Protocol):
         """Return a natural language description of the rule."""
         ...
 
+
+CATEGORICAL_COLS = {'TRANS_LV1', 'TRANS_LV2', 'Occupation_Group', 'AGE_GROUP'}
+
+
+def drop_categoricals(df: pd.DataFrame) -> pd.DataFrame:
+    cols_to_drop = [c for c in df.columns if c in CATEGORICAL_COLS]
+    return df.drop(columns=cols_to_drop)
+
