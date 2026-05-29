@@ -93,6 +93,14 @@ class CustomPreprocessor(FeaturePreprocessor):
         hist_night_ratio = get_numeric_series('HIST_NIGHT_RATIO', 0.0)
         processed_df['HIST_NIGHT_RATIO'] = hist_night_ratio
         
+        new_device_flag = get_numeric_series('NEW_DEVICE_FLAG', 0.0)
+        processed_df['NEW_DEVICE_FLAG'] = new_device_flag
+        
+        # Credit & Infrastructure features (New 2026)
+        processed_df['LIMIT_UTILIZATION_VELOCITY'] = get_numeric_series('LIMIT_UTILIZATION_VELOCITY', 0.0)
+        processed_df['STRUCTURING_OVERPAYMENT_FLAG'] = get_numeric_series('STRUCTURING_OVERPAYMENT_FLAG', 0.0)
+        processed_df['IP_HOPPING_VELOCITY'] = get_numeric_series('IP_HOPPING_VELOCITY', 0.0)
+        
         # Keep relative features derived from amounts/counts that were not explicitly removed
         hist_avg_trans = get_numeric_series('HIST_AVG_TRANS_AMOUNT', 0.0)
         processed_df['TRANS_AMOUNT_Z_SCORE'] = (trans_amount / (hist_avg_trans + 1e-5)).astype(float)

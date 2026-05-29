@@ -1,0 +1,44 @@
+{
+  "ato_panic_exact": {
+    "<1h + >10M + Outside": 496,
+    "pct": 0.035
+  },
+  "dormancy_exact": {
+    ">90d + >10M + Outside": 867,
+    "pct": 0.0611
+  },
+  "low_risk_bypass": {
+    "low_risk_channel_total": 74235,
+    "topup_channel_total": 353944
+  },
+  "auth_downgrade": {
+    "total_customers": 76357,
+    "bio_gt_5pct": 22935,
+    "bio_gt_50pct": 0
+  },
+  "ip_hopping": {
+    "total_devices": 72050,
+    "devices_gte2_ips": 47357,
+    "devices_gte3_ips": 41957
+  },
+  "structuring_overpayment": {
+    "cc_repayment_total": 51185,
+    "multi_repay_customers": 5285,
+    "overpaying_customers": 3456
+  },
+  "bust_out": {
+    "total_customers": 39876,
+    "util_gte_80": 4733,
+    "util_gte_95": 710
+  },
+  "combined_bypass": {
+    "current_rule1": 604748,
+    "current_rule1_pct": 42.65,
+    "new_channel_bypass": 402621,
+    "new_additions": 61397,
+    "combined_total": 666145,
+    "combined_pct": 46.98,
+    "remaining_for_ml": 751885,
+    "remaining_pct": 53.02
+  }
+}

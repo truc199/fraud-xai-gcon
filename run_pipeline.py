@@ -6,7 +6,7 @@ import json
 import re
 import numpy as np
 from collections import Counter
-from src.pipeline.advanced_data_loader import AdvancedDataLoader
+from src.pipeline.fraud_2026_data_loader import Fraud2026DataLoader
 from src.pipeline.custom_preprocessor import CustomPreprocessor
 from src.pipeline.custom_explainer import CustomBRACEExplainer
 from src.pipeline.custom_orchestrator import CustomHierarchicalMLPipeline
@@ -14,6 +14,9 @@ from src.pipeline.nnpu_c_classifier import NNPUCModelAgent
 from src.pipeline.ewc_model_agent import EWCModelAgent
 from src.pipeline.plugins import ConsoleLoggerPlugin, MetricsTrackerPlugin
 from src.pipeline.rules import SequenceRarityRule, VelocityBypassRule
+from src.pipeline.dormancy_wakeup_rule import DormancyWakeupRule
+from src.pipeline.ato_panic_rule import ATOPanicRule
+from src.pipeline.low_risk_channel_rule import LowRiskChannelBypassRule
 
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "gcontest.db"))
@@ -61,7 +64,7 @@ def main():
     print("=== Advanced Cohort Fraud & xAI Pipeline Demo ===")
     
     # 1. Instantiate modular components conforming to Protocols
-    data_loader = AdvancedDataLoader(db_path=DB_PATH)
+    data_loader = Fraud2026DataLoader(db_path=DB_PATH)
     preprocessor = CustomPreprocessor()
     
     # Use NNPU & C Calibrated XGBoost Model Agent (Option A + C)
@@ -73,8 +76,14 @@ def main():
     
     # 2. Assemble the Pipeline (Hierarchical Fallback Routing - Option B)
     rules = [
+        # Existing BYPASS rules
         SequenceRarityRule(rarity_threshold=-1.0, amount_threshold=500000.0),
-        VelocityBypassRule(amount_threshold=500000.0, count_1h_threshold=1.0, count_24h_threshold=2.0)
+        VelocityBypassRule(amount_threshold=500000.0, count_1h_threshold=1.0, count_24h_threshold=2.0),
+        # New BYPASS rule
+        LowRiskChannelBypassRule(amount_threshold=5_000_000),
+        # New BLOCK rules (Fraud=1 overrides Safe=0 per orchestrator logic)
+        DormancyWakeupRule(dormancy_days=90, amount_threshold=10_000_000),
+        ATOPanicRule(hours_threshold=1.0, amount_threshold=10_000_000, min_hist_count=10),
     ]
     pipeline = CustomHierarchicalMLPipeline(
         data_loader=data_loader,

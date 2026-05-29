@@ -1,18 +1,15 @@
-# Banking Fraud & xAI Pipeline
+# Banking Fraud & xAI Pipeline V3 (25 Features & Tiered Inference)
 
-An advanced, production-ready machine learning framework for banking fraud detection and Explainable AI (xAI). It combines unsupervised ensemble methods with Positive-Unlabeled (PU) XGBoost classifiers, exact SHAP explanations, joint feature interaction matrices, and decision boundary counterfactual alerts.
-
-For a detailed breakdown of the mathematical formulations, preprocessing steps, and architectural choices, see [PIPELINE.md](PIPELINE.md).
+An advanced, production-ready machine learning framework for banking fraud detection and Explainable AI (xAI). Phiên bản V3 này được nâng cấp đáng kể với kiến trúc **Tiered Inference (Định tuyến phân tầng 3 lớp)**, **25 đặc trưng số hóa (features)** (bao gồm Thiết bị, Hạ tầng mạng, Tín dụng), và **PU Learning kết hợp EWC (Elastic Weight Consolidation)** để chống quên thảm họa (Catastrophic Forgetting).
 
 ---
 
-## 1. Setup & Data Requirements
+## 1. Yêu Cầu Dữ Liệu & Cài Đặt (Setup & Data Requirements)
 
-The raw datasets are large and excluded from version control. You must manually acquire and place the raw datasets inside the `data/` directory before running the pipeline.
+Các bộ dữ liệu thô có kích thước lớn nên không được đưa vào version control (Git). Bạn cần đặt các tệp dữ liệu nguyên bản vào thư mục `data/` trước khi chạy hệ thống.
 
-### Required Directory Structure
-Ensure your `data/` folder is structured as follows:
-```
+### Cấu trúc thư mục `data/` yêu cầu:
+```text
 gcontest/
 └── data/
     ├── 0.Data Guidline.xlsx       # Metadata guidelines sheet
@@ -26,70 +23,69 @@ gcontest/
 
 ---
 
-## 2. Step-by-Step Execution Guide
+## 2. Hướng Dẫn Chạy Pipeline (Step-by-Step Execution Guide)
 
-### Step 1: Install Dependencies
-This project uses `uv` for ultra-fast, reproducible dependency management. Install the required libraries into the local virtual environment:
+Dự án này tuân thủ chuẩn quản lý gói `uv`. Vui lòng **KHÔNG DÙNG `pip install`** hay `python <file.py>`.
+
+### Bước 1: Cài đặt Dependencies
 ```bash
 uv sync
 ```
 
-### Step 2: Clean Data & Build SQLite Database
-Run the preprocessor builder to clean the raw files and ingest them into a fast, indexed SQLite database:
+### Bước 2: Làm sạch dữ liệu và Xây dựng Database SQLite
+Chạy kịch bản tiền xử lý để dọn dẹp file CSV thô và chuyển vào SQLite (giúp truy vấn tốc độ cao):
 ```bash
 uv run clean_and_build_db.py
 ```
-**What this does**:
-* Extracts database definitions and standardizes column name mismatches.
-* Normalizes dates to `YYYY-MM-DD` and string flags to binary `1`/`0` booleans.
-* Loads CSVs in streaming batches to limit RAM footprint.
-* Builds high-performance indexes on `CUSTOMER_NUMBER` for immediate database queries.
+**Chức năng:**
+* Chuẩn hóa ngày tháng, tên cột, chuyển giá trị boolean thành 1/0.
+* Đọc CSV dạng streaming để tránh tràn RAM.
+* Tạo index trên `CUSTOMER_NUMBER` để tối ưu hóa hiệu năng tính toán cửa sổ trượt.
 
-### Step 3: Run the End-to-End Pipeline
-Run the demonstration script to train the hybrid models, run inference, generate explanations, and output flagged alerts:
+### Bước 3: Chạy Pipeline Thực Thi Đầu-Cuối (End-to-End Pipeline)
+Chạy script chính để kích hoạt luồng 3 Tầng, PU Learning, và Continuous Learning (EWC):
 ```bash
 uv run run_pipeline.py
 ```
-**What this does**:
-* Evaluates cohort structures using Gaussian Mixture Model (GMM).
-* Computes unsupervised anomalies blending Isolation Forests and PyTorch Autoencoders.
-* Refines thresholds using a sample-weighted PU-Learning XGBoost classifier.
-* Calculates TreeSHAP attributions, off-diagonal interaction pairs (toxic combinations), and decision boundary counterfactual target values.
-* Exports anomaly alerts and component configuration files to the `data/` folder.
+**Chức năng của Pipeline V3:**
+* Khởi tạo **Fraud2026DataLoader** và **CustomPreprocessor** để trích xuất 25 features mạnh mẽ.
+* **Tier 1 (Rules):** Áp dụng 5 quy tắc định tuyến (SequenceRarity, VelocityBypass, LowRiskChannelBypass, DormancyWakeup, ATOPanic) để BLOCK gian lận очев hoặc BYPASS giao dịch an toàn (lọc ~30% lượng giao dịch).
+* **Tier 2 (ML):** Chạy thuật toán Positive-Unlabeled (PU) XGBoost kết hợp Calibration (NNPUCModelAgent) cho tập dữ liệu Vùng xám (Ambiguous).
+* **Tier 3 (xAI):** Sử dụng `CustomBRACEExplainer` để tạo giải thích TreeSHAP, ma trận tương tác độc hại (Toxic Interactions) và Counterfactual Recourse (tìm mức giảm số tiền để an toàn).
+* **Phase 5 (EWC):** Mô phỏng Continuous Learning chống Distribution Drift bằng Autoencoder và Fisher Information Matrix.
 
-### Step 4: Run the Web Dashboard
-Start the FastAPI server to access the premium glassmorphic dark-theme UI:
+### Bước 4: Chạy Web Dashboard
+Kích hoạt giao diện UI Web FastAPI (Glassmorphism Dark Theme):
 ```bash
 uv run uvicorn app:app --host 0.0.0.0 --port 8000
 ```
-Open [http://localhost:8000](http://localhost:8000) in your browser.
-
-**What this does**:
-* **Sidebar History**: Lists all previous CSV/JSON runs.
-* **Console Terminal**: Displays live execution console output in the browser when the pipeline is running.
-* **Alert Cards Grid**: Displays detailed transaction alert cards with color-coded SHAP progress bars, toxic interactions, and recourse recommendations.
+Mở trình duyệt tại [http://localhost:8000](http://localhost:8000). Tại đây bạn có thể xem luồng console trực tiếp (SSE), quét lịch sử các lần chạy trong `data/exports` và theo dõi từng thẻ giao dịch bị cảnh báo.
 
 ---
 
-## 3. Pipeline Output Files
+## 3. Các Tệp Đầu Ra (Output Files)
 
-Running `run_pipeline.py` creates the following files in the `data/` directory:
+Mỗi lần chạy `run_pipeline.py`, các tệp sau sẽ được tự động tạo trong thư mục `data/`:
 
-*   `data/anomaly_alerts_latest.csv`: Latest anomaly-only transaction alerts (filtered by prediction flag). Features reordered to display critical xAI outputs (`CUSTOMER_NUMBER`, `ANOMALY_SCORE`, `EXPLANATION`, `TOP_SHAP_CONTRIBUTORS`, `TOP_INTERACTIONS`, `COUNTERFACTUAL`) first.
-*   `data/anomaly_alerts_latest_metadata.json`: A companion metadata JSON mapping the **exact classes and components** (e.g. data loader, preprocessor, model agent, explainer, plugins) used in that specific pipeline run.
-*   `data/exports/anomaly_alerts_YYYYMMDD_HHMMSS.csv`: Timestamped CSV archive of the anomaly alerts.
-*   `data/exports/anomaly_alerts_YYYYMMDD_HHMMSS_metadata.json`: Timestamped companion JSON metadata configuration archive.
+*   `data/anomaly_alerts_latest.csv`: Danh sách các giao dịch bị đánh dấu gian lận (Anomalies). Các cột xAI quan trọng (`ANOMALY_SCORE`, `EXPLANATION`, `TOP_SHAP_CONTRIBUTORS`, v.v.) được đẩy lên đầu để dễ đọc.
+*   `data/anomaly_alerts_latest_metadata.json`: Tệp lưu trữ cấu hình Metadata (lưu chính xác tên class Loader, Preprocessor, Model, Explainer đã chạy).
+*   `data/evaluation_report.md`: Báo cáo thống kê tổng quan (phân bố rủi ro, tần suất xuất hiện feature, tương tác độc hại).
+*   `data/exports/anomaly_alerts_YYYYMMDD_HHMMSS.csv`: Tệp lưu trữ (archive) kết quả chạy có đánh dấu thời gian.
+*   `data/exports/anomaly_alerts_YYYYMMDD_HHMMSS_metadata.json`: Tệp metadata archive tương ứng.
 
 ---
 
-## 4. Component Extensions Policy (No Code Deletion)
+## 4. Chính Sách Mở Rộng Component (Không Xóa Code Cũ)
 
-The pipeline enforces separation of concerns via strictly typed Python Protocols (`src/pipeline/protocols.py`). When testing new pipeline modules:
+Kiến trúc tuân thủ Python Protocols trong `src/pipeline/protocols.py`. Để thử nghiệm cơ chế mới:
 
-1.  **NEVER delete or overwrite existing component code** in the codebase (e.g., in `src/pipeline/data_loaders.py`).
-2.  **Create a new file** in the appropriate directory (e.g. `src/pipeline/second_order_markov_loader.py`).
-3.  **Implement your new class** (e.g., `SecondOrderMarkovDataLoader`) conforming to the target Protocol.
-4.  **Plug the new component** into `run_pipeline.py` by importing it and swapping instances in the initialization block:
+1.  **KHÔNG XÓA** hoặc ghi đè code class cũ (ví dụ không xóa `advanced_preprocessor.py`).
+2.  **TẠO FILE MỚI** (ví dụ `custom_preprocessor.py`) và định nghĩa class mới thực thi Protocol tương ứng.
+3.  **CẮM (PLUG)** class mới vào `run_pipeline.py` ở hàm `main()`:
     ```python
-    data_loader = SecondOrderMarkovDataLoader(db_path=DB_PATH)
+    # Thay vì dùng bản cũ:
+    # preprocessor = AdvancedPreprocessor()
+    
+    # Hãy cắm bản V3 mới vào:
+    preprocessor = CustomPreprocessor()
     ```

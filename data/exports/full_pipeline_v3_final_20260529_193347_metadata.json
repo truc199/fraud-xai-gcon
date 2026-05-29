@@ -1,0 +1,25 @@
+{
+    "timestamp": "20260529_193347",
+    "components": {
+        "orchestrator": "CustomHierarchicalMLPipeline",
+        "data_loader": "Fraud2026DataLoader",
+        "preprocessor": "CustomPreprocessor",
+        "model_agent": "NNPUCModelAgent",
+        "explainer": "CustomBRACEExplainer",
+        "plugins": [
+            "ConsoleLoggerPlugin",
+            "MetricsTrackerPlugin"
+        ]
+    },
+    "metrics": {
+        "anomalies_flagged": 94,
+        "total_records_evaluated": 5000
+    },
+    "rules": [
+        "Bypass if transaction sequence likelihood is typical (rarity score > -1.0) and transaction amount is less than 500,000.00.",
+        "Bypass if transaction amount is less than 500,000.00 and frequency is normal (1-hour count <= 1.0 and 24-hour count <= 2.0).",
+        "Bypass if transaction channel is low-risk (Cable, Credit_card_repayment, Game, Lending_repayment, Lifestyle_payment, MCPP, Utilities_payment) and transaction amount is less than 5,000,000.",
+        "Block if account has been dormant for more than 90 days and transaction amount exceeds 10,000,000 and transaction is directed outside the bank.",
+        "Block if a security credential was changed within the last 1.0 hour(s) and transaction amount exceeds 10,000,000 and transaction is directed outside the bank and the customer has more than 10 historical transactions."
+    ]
+}

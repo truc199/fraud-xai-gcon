@@ -1,0 +1,429 @@
+{
+  "total_transactions": 1418030,
+  "rule1_sequence_rarity": {
+    "description": "Bypass if ACTIVITY_SEQ_RARITY > -1.0 AND TRANS_AMOUNT < 500K",
+    "amount_lt_500k_count": 604748,
+    "amount_lt_500k_pct": 42.65,
+    "note": "ACTIVITY_SEQ_RARITY requires full pipeline. Amount < 500K sets the upper bound."
+  },
+  "amount_distribution": {
+    "<100K": {
+      "count": 254378,
+      "pct": 17.94
+    },
+    "100K-500K": {
+      "count": 350370,
+      "pct": 24.71
+    },
+    "500K-1M": {
+      "count": 163881,
+      "pct": 11.56
+    },
+    "1M-5M": {
+      "count": 358087,
+      "pct": 25.25
+    },
+    "5M-10M": {
+      "count": 97006,
+      "pct": 6.84
+    },
+    "10M-50M": {
+      "count": 137243,
+      "pct": 9.68
+    },
+    "50M-100M": {
+      "count": 29334,
+      "pct": 2.07
+    },
+    ">100M": {
+      "count": 27731,
+      "pct": 1.96
+    }
+  },
+  "rule2_velocity_bypass": {
+    "description": "Bypass if TRANS_AMOUNT < 500K AND COUNT_1H <= 1 AND COUNT_24H <= 2",
+    "safe_count": 462427,
+    "safe_pct": 32.61
+  },
+  "count_1h_distribution": {
+    "1": {
+      "count": 1261522,
+      "pct": 88.96
+    },
+    "2": {
+      "count": 142121,
+      "pct": 10.02
+    },
+    "3": {
+      "count": 12796,
+      "pct": 0.9
+    },
+    "4": {
+      "count": 1503,
+      "pct": 0.11
+    },
+    "5": {
+      "count": 74,
+      "pct": 0.01
+    },
+    "6": {
+      "count": 5,
+      "pct": 0.0
+    },
+    "7": {
+      "count": 3,
+      "pct": 0.0
+    },
+    "8": {
+      "count": 6,
+      "pct": 0.0
+    }
+  },
+  "count_24h_distribution": {
+    "1": {
+      "count": 750410,
+      "pct": 52.92
+    },
+    "2": {
+      "count": 353089,
+      "pct": 24.9
+    },
+    "3": {
+      "count": 147909,
+      "pct": 10.43
+    },
+    "4": {
+      "count": 66559,
+      "pct": 4.69
+    },
+    "5": {
+      "count": 33164,
+      "pct": 2.34
+    },
+    "6": {
+      "count": 18776,
+      "pct": 1.32
+    },
+    "7": {
+      "count": 11950,
+      "pct": 0.84
+    },
+    "8": {
+      "count": 8405,
+      "pct": 0.59
+    },
+    "9": {
+      "count": 6374,
+      "pct": 0.45
+    },
+    "10": {
+      "count": 4939,
+      "pct": 0.35
+    },
+    "11": {
+      "count": 3976,
+      "pct": 0.28
+    },
+    "12": {
+      "count": 3189,
+      "pct": 0.22
+    },
+    "13": {
+      "count": 2492,
+      "pct": 0.18
+    },
+    "14": {
+      "count": 2070,
+      "pct": 0.15
+    },
+    "15": {
+      "count": 1427,
+      "pct": 0.1
+    }
+  },
+  "candidate_a_ato_panic": {
+    "description": "BLOCK if HOURS_SINCE_SEC_EVENT < 1h AND TRANS_AMOUNT > 10M",
+    "security_events_total": 111835,
+    "customers_with_sec_events": 71635,
+    "security_event_types": {
+      "MB_SET_PIN": 69744,
+      "CHANGE_PASSWORD": 26410,
+      "MB_CHANGE_PIN": 8028,
+      "MB_RESET_PIN": 7496,
+      "SET_PASSWORD": 103,
+      "ACCOUNT_ADDRESS_BOOK_UPDATE": 54
+    },
+    "transactions_gte_10m": 194308,
+    "transactions_gte_10m_pct": 13.7,
+    "note": "Exact match requires joining sec events with transactions by time. Upper bound analysis provided."
+  },
+  "candidate_b_new_account_mule": {
+    "description": "BLOCK if TENURE_DAYS < 30 AND TRANS_LV2='Outside' AND TRANS_AMOUNT > 10M",
+    "tenure_lt_30": 147661,
+    "outside_bank_count": 759815,
+    "outside_bank_pct": 53.58,
+    "combined_match": 17144,
+    "tenure_distribution": {
+      "<7d": {
+        "count": 27144,
+        "pct": 1.91
+      },
+      "7-30d": {
+        "count": 120382,
+        "pct": 8.49
+      },
+      "30-90d": {
+        "count": 387490,
+        "pct": 27.33
+      },
+      "90d-1y": {
+        "count": 882879,
+        "pct": 62.26
+      },
+      "1-2y": {
+        "count": 0,
+        "pct": 0.0
+      },
+      ">2y": {
+        "count": 0,
+        "pct": 0.0
+      }
+    }
+  },
+  "candidate_c_dormancy_wakeup": {
+    "description": "BLOCK if DAYS_SINCE_LAST > 90 AND TRANS_AMOUNT > 10M AND TRANS_LV2='Outside'",
+    "dormant_90d_count": 6914,
+    "dormant_wakeup_match": 867,
+    "dormancy_distribution": {
+      "<1d": {
+        "count": 629486,
+        "pct": 44.39
+      },
+      "1-7d": {
+        "count": 569523,
+        "pct": 40.16
+      },
+      "7-30d": {
+        "count": 178697,
+        "pct": 12.6
+      },
+      "30-90d": {
+        "count": 33383,
+        "pct": 2.35
+      },
+      "90-180d": {
+        "count": 5385,
+        "pct": 0.38
+      },
+      "180d-1y": {
+        "count": 1536,
+        "pct": 0.11
+      },
+      ">1y": {
+        "count": 0,
+        "pct": 0.0
+      }
+    }
+  },
+  "candidate_d_staff_bypass": {
+    "description": "BYPASS if STAFF=1 AND TRANS_AMOUNT < 5M",
+    "staff_transactions": 129088,
+    "staff_lt_5m": 106227
+  },
+  "transaction_type_distribution": {
+    "TRANS_LV1": {
+      "Transfer": {
+        "count": 989851,
+        "pct": 69.8
+      },
+      "Topup": {
+        "count": 348766,
+        "pct": 24.6
+      },
+      "Payment": {
+        "count": 79413,
+        "pct": 5.6
+      }
+    },
+    "TRANS_LV2": {
+      "Outside_bank": {
+        "count": 759815,
+        "pct": 53.58
+      },
+      "Within_bank": {
+        "count": 229191,
+        "pct": 16.16
+      },
+      "Mobile": {
+        "count": 177812,
+        "pct": 12.54
+      },
+      "eWallet": {
+        "count": 170529,
+        "pct": 12.03
+      },
+      "Credit_card_repayment": {
+        "count": 51185,
+        "pct": 3.61
+      },
+      "Utilities_payment": {
+        "count": 21145,
+        "pct": 1.49
+      },
+      "QR_payment": {
+        "count": 5603,
+        "pct": 0.4
+      },
+      "VNDirect": {
+        "count": 845,
+        "pct": 0.06
+      },
+      "Insurance_payment": {
+        "count": 742,
+        "pct": 0.05
+      },
+      "Lifestyle_payment": {
+        "count": 451,
+        "pct": 0.03
+      },
+      "Lending_repayment": {
+        "count": 287,
+        "pct": 0.02
+      },
+      "Game": {
+        "count": 260,
+        "pct": 0.02
+      },
+      "Cable": {
+        "count": 160,
+        "pct": 0.01
+      },
+      "MCPP": {
+        "count": 5,
+        "pct": 0.0
+      }
+    }
+  },
+  "candidate_f_balance_drawdown": {
+    "description": "BLOCK if SUM_AMOUNT_24H / HIST_AVG_CA_BALANCE > 0.8 AND TRANS_LV2='Outside'",
+    "customers_with_balance": 1417315,
+    "drawdown_gt_80_outside": 380481,
+    "drawdown_stats": {
+      "mean": 691.8427,
+      "median": 0.4679,
+      "p90": 8.2412,
+      "p95": 18.0796,
+      "p99": 111.1447,
+      "max": 298058123.6461
+    }
+  },
+  "candidate_g_multi_beneficiary": {
+    "description": "BLOCK if UNIQUE_BENEFICIARIES_24H >= 3 AND SUM_AMOUNT_24H > 20M",
+    "avg_transactions_with_beneficiary": 27.02,
+    "customers_gte3_unique_bene_lifetime": 36805,
+    "customers_gte5_unique_bene_lifetime": 30396
+  },
+  "candidate_h_night_high_value": {
+    "description": "ALERT if TRANS_HOUR in [0-5] AND TRANS_AMOUNT > 20M AND TRANS_LV2='Outside'",
+    "night_transactions": 46449,
+    "night_high_outside": 1721,
+    "hour_distribution": {
+      "0": {
+        "count": 17191,
+        "pct": 1.21
+      },
+      "1": {
+        "count": 9103,
+        "pct": 0.64
+      },
+      "2": {
+        "count": 5889,
+        "pct": 0.42
+      },
+      "3": {
+        "count": 4480,
+        "pct": 0.32
+      },
+      "4": {
+        "count": 4063,
+        "pct": 0.29
+      },
+      "5": {
+        "count": 5723,
+        "pct": 0.4
+      },
+      "6": {
+        "count": 15691,
+        "pct": 1.11
+      },
+      "7": {
+        "count": 34872,
+        "pct": 2.46
+      },
+      "8": {
+        "count": 76433,
+        "pct": 5.39
+      },
+      "9": {
+        "count": 101319,
+        "pct": 7.15
+      },
+      "10": {
+        "count": 104037,
+        "pct": 7.34
+      },
+      "11": {
+        "count": 103665,
+        "pct": 7.31
+      },
+      "12": {
+        "count": 81606,
+        "pct": 5.75
+      },
+      "13": {
+        "count": 83740,
+        "pct": 5.91
+      },
+      "14": {
+        "count": 96236,
+        "pct": 6.79
+      },
+      "15": {
+        "count": 104210,
+        "pct": 7.35
+      },
+      "16": {
+        "count": 105678,
+        "pct": 7.45
+      },
+      "17": {
+        "count": 96999,
+        "pct": 6.84
+      },
+      "18": {
+        "count": 82369,
+        "pct": 5.81
+      },
+      "19": {
+        "count": 76858,
+        "pct": 5.42
+      },
+      "20": {
+        "count": 71147,
+        "pct": 5.02
+      },
+      "21": {
+        "count": 61203,
+        "pct": 4.32
+      },
+      "22": {
+        "count": 46294,
+        "pct": 3.26
+      },
+      "23": {
+        "count": 29224,
+        "pct": 2.06
+      }
+    }
+  }
+}
