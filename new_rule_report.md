@@ -13,7 +13,7 @@ Mục tiêu cốt lõi:
 
 ## 2. Chi Tiết Các Rule Mới Được Triển Khai
 
-Hệ thống hiện tại vận hành 5 Rule ở Tier 1, trong đó có 3 Rule mới:
+Hệ thống hiện tại vận hành 6 Rule ở Tier 1, trong đó có 4 Rule mới hoặc được nâng cấp:
 
 ### 2.1. DormancyWakeupRule (🔴 BLOCK)
 * **Logic**: `DAYS_SINCE_LAST_TRANS > 90` AND `TRANS_AMOUNT > 10,000,000` AND `TRANS_LV2 = 'Outside_bank'`
@@ -21,11 +21,16 @@ Hệ thống hiện tại vận hành 5 Rule ở Tier 1, trong đó có 3 Rule m
 * **Đo lường EDA**: Trên tập 1.4 triệu giao dịch, chỉ có 867 giao dịch (0.06%) vi phạm rule này. Tỷ lệ False Positive cực thấp vì người dùng thật hiếm khi bỏ xó tài khoản 3 tháng rồi đột nhiên chuyển >10 triệu ra ngoài.
 
 ### 2.2. ATOPanicRule (🔴 BLOCK)
-* **Logic**: `HOURS_SINCE_SEC_EVENT < 1.0` AND `TRANS_AMOUNT > 10,000,000` AND `TRANS_LV2 = 'Outside_bank'` AND `HIST_TRANS_COUNT > 10`
+* **Logic**: `HOURS_SINCE_SEC_EVENT <= 1.0` AND `TRANS_AMOUNT > 10,000,000` AND `TRANS_LV2 = 'Outside_bank'`. Chặn (Fraud 1) nếu customer tenure $\ge$ 1 ngày; chuyển về diện Nghi vấn (Ambiguous -1) nếu tenure < 1 ngày.
 * **Cơ sở nhân quả**: Phản ánh mô hình Account Takeover (ATO) kinh điển năm 2019. Kẻ tấn công lừa lấy OTP, đổi mật khẩu/mã PIN và lập tức chuyển sạch tiền ra khỏi ngân hàng trong vòng 15-90 phút do sức ép thời gian.
-* **Đo lường EDA**: Việc giới hạn `HIST_TRANS_COUNT > 10` giúp loại trừ các tài khoản vừa mở mới (onboarding) đang thực hiện đổi PIN lần đầu, giúp rule này đánh trúng các tài khoản đã tồn tại bị chiếm quyền, với mức ảnh hưởng ước tính < 400 giao dịch.
+* **Đo lường EDA**: Việc kiểm tra `tenure >= 1 ngày` giúp loại trừ các tài khoản vừa mở mới đang thực hiện đổi PIN lần đầu, tránh chặn cứng mà chuyển sang diện nghi vấn để xử lý mềm, giảm thiểu ảnh hưởng đến hành trình đăng ký/kích hoạt của người dùng mới.
 
-### 2.3. LowRiskChannelBypassRule (🟢 BYPASS)
+### 2.3. HourlyAnomalyRule (🔴 BLOCK)
+* **Logic**: `TRANS_HOUR_PROB < 0.015` AND `TRANS_AMOUNT > 10,000,000`
+* **Cơ sở nhân quả**: Chặn hành vi rút tiền đột ngột ở khung giờ lạ mà lịch sử giao dịch của khách hàng gần như không bao giờ ghi nhận hoạt động (xác suất < 1.5%), kết hợp số tiền lớn (> 10 triệu) - chỉ báo rất mạnh cho các đợt cash-out tốc độ của tội phạm chiếm quyền tài khoản (ATO).
+* **Đo lường EDA**: Rất hiếm khi người dùng thật thực hiện chuyển khoản lớn vào các giờ bất thường trong thói quen của họ.
+
+### 2.4. LowRiskChannelBypassRule (🟢 BYPASS)
 * **Logic**: `TRANS_LV2 IN ('Utilities_payment', 'Credit_card_repayment', 'Lending_repayment', 'Cable', 'Game', 'Lifestyle_payment', 'MCPP')` AND `TRANS_AMOUNT < 5,000,000`
 * **Cơ sở nhân quả**: Kẻ tấn công muốn chiếm đoạt tài sản, chúng không bao giờ dùng tiền ăn cắp để thanh toán hóa đơn điện/nước hay trả nợ thẻ tín dụng cho nạn nhân. 
 * **Đo lường EDA**: Bypass được thêm ~14,000 giao dịch/ngày. Ngưỡng 5 triệu VND được chọn thay vì 10 triệu để đề phòng kỹ thuật *Structuring Overpayment* (Rửa tiền qua trả thừa dư nợ thẻ tín dụng).

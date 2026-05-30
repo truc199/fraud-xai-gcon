@@ -139,7 +139,7 @@ Sự phân hóa càng rõ khi tính tổng dòng tiền luân chuyển trong 30 
 - *Tốc độ giao dịch bất thường:* Khi một tài khoản chạm ngưỡng 3 lệnh/giờ hoặc 6 lệnh/giờ, 34 lệnh/ngày, đó là dấu hiệu bất thường cần lưu ý. Quy mô lệnh chuyển tiền có thể đột ngột vọt lên gấp 3,48 lần, 6,89 lần, thậm chí 82,65 lần so với thói quen thường ngày.
 - *Thiết bị bất thường:* 8.227 giao dịch (0,58%) xảy ra khi tài khoản đột ngột thay đổi hệ điều hành thiết bị trong 24 giờ. 42.449 giao dịch (3%) có hiện tượng hai lệnh liên tiếp từ hai tỉnh/thành khác nhau trong chưa tới 1 giờ (Impossible Travel).
 
-Các dấu hiệu trên (tần suất đổi bảo mật, khoảng cách thời gian tới sự kiện bảo mật, hạ cấp xác thực, velocity bất thường, giao dịch ban đêm) chính là cơ sở thiết kế các đặc trưng `HOURS_SINCE_SEC_EVENT`, `HIST_BIOMETRIC_RATIO`, `NIGHT_ANOMALY`, `VELOCITY_RATIO_*`, `ACTIVITY_SEQ_RARITY` ở Phase 1-2.
+Các dấu hiệu trên (khoảng cách thời gian tới sự kiện bảo mật, tốc độ giao dịch dồn dập, độ dị biệt khung giờ giao dịch) chính là cơ sở thiết kế các đặc trưng `HOURS_SINCE_SEC_EVENT`, `SPIKE_*`, `TRANS_HOUR_PROB`, `ACTIVITY_SEQ_RARITY` ở Phase 1-2.
 
 > **Gợi ý biểu đồ:**
 > - Histogram: Phân bố `HOURS_SINCE_SEC_EVENT` cho các giao dịch xảy ra sau sự kiện bảo mật, đánh dấu ngưỡng 1 giờ và 24 giờ.
@@ -229,7 +229,7 @@ Quá trình khám phá dữ liệu đã bộc lộ một số giới hạn cấu
 
 ## Phần III: Trích xuất & Kỹ thuật Đặc trưng (Phase 1-2)
 
-Để chuyển hóa dữ liệu thô thành các tín hiệu rủi ro định lượng, hệ thống thực hiện quy trình trích xuất và kỹ thuật đặc trưng qua hai giai đoạn, tạo ra bộ ~46 đặc trưng số hóa. 
+Để chuyển hóa dữ liệu thô thành các tín hiệu rủi ro định lượng, hệ thống thực hiện quy trình trích xuất và kỹ thuật đặc trưng qua hai giai đoạn, tạo ra bộ đặc trưng số hóa tối ưu. 
 
 ### 3.1. Trích xuất dữ liệu thô (Phase 1 — Data Extraction)
 
@@ -246,10 +246,11 @@ Giai đoạn Data Extraction tập trung vào việc tính toán các thống k�
 | 3.1.7 | Thống kê Sinh trắc học | `HIST_BIOMETRIC_RATIO` (tỷ lệ dùng FaceID/Vân tay) | Phát hiện sự hạ cấp phương thức bảo mật. |
 | 3.1.8 | Phân tích Benford's Law | `BENFORD_DEV` (KL-Divergence, ngưỡng N ≥ 5) | Đánh giá độ phân kỳ của chữ số đầu tiên so với quy luật tự nhiên. |
 | 3.1.9 | Chuỗi Markov bậc 2 | `ACTIVITY_SEQ_RARITY` (nội suy backoff trên chuỗi thao tác) | Tìm ra các hành vi điều hướng ứng dụng hiếm gặp hoặc bot tự động. |
+| 3.1.10 | Xác suất giờ giao dịch | `TRANS_HOUR_PROB` (lịch sử khách hàng hoặc toàn hệ thống) | Xác định mức độ quen thuộc của khung giờ thực hiện giao dịch của khách hàng. Khung giờ lạ là chỉ báo rủi ro cao. |
 
-### 3.2. Xây dựng bộ lọc rule-based (5 loại rule)
+### 3.2. Xây dựng bộ lọc rule-based (8 loại rule)
 
-Dựa trên kết quả phân tích khám phá dữ liệu (EDA) về hành vi giao dịch và sự kiện bảo mật, hệ thống xây dựng 5 Rule nhằm giải quyết bài toán định tuyến phân tầng (Hierarchical Routing Pipeline) tại Tier 1. Mục tiêu của bộ lọc là **BLOCK** ngay lập tức các giao dịch có độ tin cậy rủi ro cực cao (Smoking gun), và **BYPASS** (cho qua) các giao dịch rủi ro cực thấp nhằm giảm tải tính toán cho mô hình ML ở Tier 2.
+Dựa trên kết quả phân tích khám phá dữ liệu (EDA) về hành vi giao dịch và sự kiện bảo mật, hệ thống xây dựng 8 Rule nhằm giải quyết bài toán định tuyến phân tầng (Hierarchical Routing Pipeline) tại Tier 1. Mục tiêu của bộ lọc là **BLOCK** ngay lập tức các giao dịch có độ tin cậy rủi ro cực cao (Smoking gun), và **BYPASS** (cho qua) các giao dịch rủi ro cực thấp nhằm giảm tải tính toán cho mô hình ML ở Tier 2.
 
 **1. DormancyWakeupRule (🔴 BLOCK)**
 * **Nội dung rule**: `DAYS_SINCE_LAST_TRANS > 90` AND `TRANS_AMOUNT > 10,000,000` AND `TRANS_LV2 = 'Outside_bank'`
@@ -257,114 +258,90 @@ Dựa trên kết quả phân tích khám phá dữ liệu (EDA) về hành vi g
 * **EDA**: Phân tích trên tập 1.4 triệu giao dịch cho thấy chỉ có 867 giao dịch (0.06%) vi phạm điều kiện này. Tỷ lệ báo động giả (False Positive) là cực thấp vì người dùng thật rất hiếm khi bỏ quên tài khoản 3 tháng rồi bất ngờ chuyển ra ngoài hơn 10 triệu đồng.
 
 **2. ATOPanicRule (🔴 BLOCK)**
-* **Nội dung rule**: `HOURS_SINCE_SEC_EVENT < 1.0` AND `TRANS_AMOUNT > 10,000,000` AND `TRANS_LV2 = 'Outside_bank'` AND `HIST_TRANS_COUNT > 10`
-* **Cơ sở**: Phản ánh mô hình Account Takeover (ATO) kinh điển. Kẻ tấn công lừa lấy OTP, đổi mật khẩu/mã PIN và lập tức chuyển sạch tiền ra khỏi ngân hàng trong vòng 15-90 phút do sức ép thời gian.
-* **EDA**: Dữ liệu sự kiện bảo mật ghi nhận ~1.200 giao dịch chớp nhoáng trong cửa sổ 1 giờ sau khi đổi thông tin xác thực. Việc giới hạn thêm `HIST_TRANS_COUNT > 10` giúp loại trừ các tài khoản vừa mở mới đang thực hiện đổi PIN lần đầu, nhắm trúng mục tiêu với mức ảnh hưởng < 400 giao dịch.
+* **Nội dung rule**: `HOURS_SINCE_SEC_EVENT <= 1.0` AND `TRANS_AMOUNT > 10,000,000` AND `TRANS_LV2 = 'Outside_bank'`. Chặn (Fraud) nếu customer tenure (tuổi tài khoản) $\ge$ 1 ngày; chuyển về diện Nghi vấn (Ambiguous -1) nếu tenure < 1 ngày.
+* **Cơ sở**: Chặn hành vi chiếm đoạt tài khoản (ATO) kinh điển. Loại trừ tài khoản mới tạo hoạt động trong ngày đầu (tenure < 1 ngày) sang diện nghi vấn để xử lý mềm thay vì chặn cứng.
+* **EDA**: Dữ liệu sự kiện bảo mật ghi nhận ~1.200 giao dịch chớp nhoáng trong cửa sổ 1 giờ sau khi đổi thông tin xác thực. Phân nhóm theo tenure giúp giảm thiểu ảnh hưởng đến hành trình đăng ký/kích hoạt của người dùng mới.
 
-**3. LowRiskChannelBypassRule (🟢 BYPASS)**
+**3. HourlyAnomalyRule (🔴 BLOCK)**
+* **Nội dung rule**: `TRANS_HOUR_PROB < 0.015` AND `TRANS_AMOUNT > 10,000,000`
+* **Cơ sở**: Chặn các giao dịch phát sinh đột xuất vào khoảng thời gian mà lịch sử khách hàng rất ít hoạt động (xác suất < 1.5%), kết hợp số tiền lớn (> 10 triệu) - chỉ báo rất mạnh cho các đợt cash-out tốc độ của tội phạm chiếm quyền tài khoản (ATO).
+* **EDA**: Rất hiếm khi khách hàng bình thường chuyển tiền lớn vào những khung giờ lạ của chính họ.
+
+**4. CreditCardBustOutRule (🔴 BLOCK)**
+* **Nội dung rule**: `LIMIT_UTILIZATION_VELOCITY >= 0.45` AND `TRANS_AMOUNT > 20,000,000` AND `BALANCE_COVERAGE_RATIO > 10.0`
+* **Cơ sở**: Chặn hành vi vét hạn mức thẻ tín dụng tẩu tán tài sản đột biến (Bust-out Fraud). Kết hợp cả tốc độ tăng trưởng dư nợ (velocity MoM), số tiền lớn và số dư tài khoản thanh toán siêu thấp để bắt trúng các tài khoản bị chiếm đoạt hoặc mule.
+* **EDA**: Chỉ kích hoạt chặn trên **282 giao dịch** trong toàn bộ 1.4 triệu dòng lịch sử (~0.0199%), đảm bảo độ chính xác (Precision) cực cao và giảm thiểu tối đa báo động giả.
+
+**5. LowRiskChannelBypassRule (🟢 BYPASS)**
 * **Nội dung rule**: `TRANS_LV2 IN ('Utilities_payment', 'Credit_card_repayment', 'Lending_repayment', 'Cable', 'Game', 'Lifestyle_payment', 'MCPP')` AND `TRANS_AMOUNT < 5,000,000`
 * **Cơ sở**: Kẻ gian muốn chiếm đoạt tài sản sẽ không bao giờ dùng tiền ăn cắp để thanh toán hóa đơn điện/nước hay trả nợ thẻ tín dụng cho nạn nhân.
 * **EDA**: Bypass này giúp lọc đi ~14.000 giao dịch/ngày. Ngưỡng 5 triệu VND được chọn (thay vì 10 triệu) nhằm đề phòng kỹ thuật Structuring Overpayment (Rửa tiền qua thanh toán thừa dư nợ thẻ tín dụng).
 
-**4. SequenceRarityRule (🟢 BYPASS)**
-* **Nội dung rule**: `ACTIVITY_SEQ_RARITY > -1.0` AND `TRANS_AMOUNT < 500,000`
-* **Cơ sở**: Các chuỗi hành động (activity sequence) điển hình (có điểm độ hiếm > -1.0) thường phản ánh hành vi điều hướng, sử dụng bình thường, quen thuộc của người dùng. Kết hợp với lượng giao dịch rất nhỏ, mức độ rủi ro gian lận gần như không có.
-* **EDA**: Mô hình Markov bậc 2 cho thấy đa phần giao dịch sinh hoạt hàng ngày đi theo các luồng thao tác quen thuộc. Kèm theo đặc trưng phân phối số tiền cực đoan (54.2% giao dịch < 1 triệu), rule này lọc bỏ một lượng lớn giao dịch "sạch".
+**6. SequenceRarityRule (🟢 BYPASS)**
+* **Nội dung rule**: `ACTIVITY_SEQ_RARITY > -1.0` AND `TRANS_AMOUNT < 5,000,000`
+* **Cơ sở**: Các chuỗi hành động (activity sequence) điển hình (có điểm độ hiếm > -1.0) thường phản ánh hành vi điều hướng, sử dụng bình thường, quen thuộc của người dùng. Kết hợp với lượng giao dịch trung bình nhỏ, mức độ rủi ro gian lận gần như không có.
+* **EDA**: Mô hình Markov bậc 2 cho thấy đa phần giao dịch sinh hoạt hàng ngày đi theo các luồng thao tác quen thuộc. Việc nâng ngưỡng lên 5 triệu VND (thay vì 500.000 VND) giúp tăng độ phủ tự động cho các giao dịch chuyển khoản sinh hoạt thông thường mà vẫn đảm bảo an toàn vì chuỗi thao tác hoàn toàn chuẩn chỉ.
 
-**5. VelocityBypassRule (🟢 BYPASS)**
+**7. VelocityBypassRule (🟢 BYPASS)**
 * **Nội dung rule**: `TRANS_AMOUNT < 500,000` AND `COUNT_1H <= 1` AND `COUNT_24H <= 2`
 * **Cơ sở**: Tần suất giao dịch ở mức thưa thớt bình thường (không dồn dập) kết hợp quy mô giao dịch nhỏ cho thấy đây không phải hành vi Card Testing (thử thẻ) hay Mule Fan-out (chuyển tiền phân tán).
 * **EDA**: Tần suất giao dịch chuẩn ở mức thưa thớt, trung bình đạt 1.03 giao dịch/giờ và 99% khách hàng chỉ thực hiện tối đa 11 lệnh/ngày. Tốc độ giao dịch của kẻ gian thường đẩy lên 3-6 lệnh/giờ. Do đó rule Bypass này hoạt động vô cùng an toàn.
 
+**8. SmallAmountBypassRule (🟢 BYPASS)**
+* **Nội dung rule**: `TRANS_AMOUNT < 500,000`
+* **Cơ sở**: Bỏ qua trực tiếp tất cả giao dịch có giá trị cực nhỏ (dưới 500.000 VND). Trong hệ thống ngân hàng số bán lẻ, các giao dịch dưới 500K thường là thanh toán sinh hoạt, ăn uống hoặc nạp tiền thẻ cào giá trị thấp, rủi ro gian lận chiếm đoạt diện rộng là vô cùng thấp.
+* **EDA**: Phân loại giao dịch cho thấy hơn 35% giao dịch trong hệ thống thuộc phân khúc dưới 500.000 VND. Việc tự động bypass các giao dịch này giúp giảm hơn 1/3 tải lượng tính toán cho toàn bộ pipeline xử lý sâu ở Tier 2 và loại bỏ phần lớn cảnh báo giả ở phân khúc tiền nhỏ.
+
 ### 3.3. Kỹ thuật đặc trưng (Phase 2 — Feature Engineering)
 
-Giai đoạn Feature Engineering (thực hiện bởi `AdvancedPreprocessor`) tổng hợp các thông tin đã trích xuất thành các đặc trưng tương đối (ratios, z-scores, interaction features) giúp khắc phục nhược điểm của dữ liệu chênh lệch lớn (heavy-tailed) và thiết lập cơ sở nhận diện các điểm bất thường. Hệ thống chuyển đổi và tạo ra bộ 25 đặc trưng số hóa, được phân thành 8 nhóm chức năng.
+Giai đoạn Feature Engineering (thực hiện bởi `NewFeaturesPreprocessor`) tổng hợp các thông tin đã trích xuất thành các đặc trưng rủi ro chất lượng cao (ratios, z-scores, spike indices). Sau quá trình sàng lọc loại bỏ các đặc trưng gây nhiễu và kém hiệu quả, hệ thống tối ưu hóa bộ đặc trưng còn lại **8 đặc trưng rủi ro cốt lõi** nạp trực tiếp vào mô hình học máy ở Tier 2, kết hợp với các đặc trưng phụ trợ dùng riêng cho bộ lọc Rule-based ở Tier 1.
 
-#### Nhóm 1: Lệch chuẩn Số tiền (Amount Deviation)
+#### 3.3.1. 8 đặc trưng rủi ro nạp vào mô hình ML (Tier 2)
 
+##### Nhóm 1: Lệch chuẩn Số tiền (Amount Deviation)
 Nhóm đặc trưng này cá nhân hóa rủi ro theo từng khách hàng, thay vì áp dụng ngưỡng tuyệt đối cứng nhắc — giải quyết bài toán chênh lệch thu nhập giữa các phân khúc khách hàng (sinh viên vs. doanh nhân).
 
 | Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
 | :--- | :--- | :--- | :--- |
-| `TRANS_AMOUNT_Z_SCORE` | Mức độ bất thường của số tiền giao dịch hiện tại so với lịch sử chi tiêu cá nhân của khách hàng. | `TRANS_AMOUNT / (HIST_AVG_TRANS_AMOUNT + ε)` | Kẻ chiếm đoạt tài khoản (ATO) luôn muốn rút tối đa tiền trong thời gian ngắn nhất, tạo ra Z-Score đột biến. Ngưỡng cứng sẽ bỏ lọt gian lận ở nhóm thu nhập cao hoặc tạo False Positive ở nhóm thu nhập thấp. Z-Score theo cá nhân giải quyết cả hai vấn đề. |
-| `BALANCE_COVERAGE_RATIO` | Tỷ lệ giữa số tiền giao dịch và số dư trung bình lịch sử tài khoản. | `TRANS_AMOUNT / (HIST_AVG_CA_BALANCE + ε)` | Dấu hiệu kinh điển của Money Mule (FATF, 2021): dòng tiền vừa vào lập tức bị chuyển đi, khiến số tiền giao dịch vượt xa số dư bình quân. Tỷ lệ > 1.0 cho thấy dấu hiệu "rút cạn" hoặc tài khoản trung chuyển. |
-| `TRANS_AMOUNT_VS_30D_AVG_RATIO` | So sánh số tiền giao dịch hiện tại với mức chi tiêu trung bình 30 ngày gần nhất (baseline ngắn hạn). | `TRANS_AMOUNT / (SUM_AMOUNT_30D / (COUNT_30D + ε) + ε)` | Hoạt động như "bộ lọc thích ứng": nếu khách hàng thực sự đã chi tiêu cao gần đây (do tăng lương), tỷ lệ sẽ thấp, tránh cảnh báo sai. 75% giao dịch có ratio < 3.0; nhóm bị cảnh báo thường > 5.0. |
+| `TRANS_AMOUNT_Z_SCORE` | Mức độ lệch chuẩn thống kê của số tiền giao dịch hiện tại so với lịch sử chi tiêu cá nhân của khách hàng. | `(TRANS_AMOUNT - HIST_AVG_TRANS_AMOUNT) / HIST_STD_TRANS_AMOUNT` (nếu std > 1e-5; ngược lại = 0.0) | Kẻ chiếm đoạt tài khoản (ATO) luôn muốn rút tối đa tiền, tạo ra độ lệch chuẩn Z-Score cực lớn. Công thức Z-score thống kê giúp loại bỏ nhiễu biên và chuẩn hóa chính xác mức độ bất thường. |
+| `BALANCE_COVERAGE_RATIO` | Tỷ lệ giữa số tiền giao dịch và số dư trung bình lịch sử tài khoản. | `TRANS_AMOUNT / (HIST_AVG_CA_BALANCE + 1e-5)` | Dấu hiệu kinh điển của Money Mule: dòng tiền vừa vào lập tức bị chuyển đi hết, khiến số tiền giao dịch vượt xa số dư bình quân lâu dài. Tỷ lệ > 1.0 cho thấy dấu hiệu "rút cạn" hoặc trung chuyển tiền. |
+| `TRANS_AMOUNT_VS_30D_AVG_RATIO` | So sánh số tiền giao dịch hiện tại với mức chi tiêu trung bình ngắn hạn 30 ngày gần nhất. | `TRANS_AMOUNT / (SUM_AMOUNT_30D / (COUNT_30D + 1e-5) + 1e-5)` | Hoạt động như "bộ lọc thích ứng": nếu khách hàng thực sự đã bắt đầu chi tiêu cao gần đây (nhờ tăng thu nhập), tỷ lệ này sẽ thấp, tránh cảnh báo sai. Ngược lại, đột biến gấp nhiều lần thói quen tháng sẽ bị phát hiện. |
 
-#### Nhóm 2: Tốc độ & Tần suất (Velocity)
-
-Nhóm đặc trưng này đo mức độ tập trung dòng tiền và số lượng giao dịch vào khoảng thời gian ngắn gần nhất. Hệ thống sử dụng chuỗi 3 tầng (1H→24H→7D→30D) để chống kỹ thuật lách (evasion): nếu tội phạm dàn giao dịch ra 7 ngày, velocity 7D/30D vẫn bắt được.
-
-| Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
-| :--- | :--- | :--- | :--- |
-| `VELOCITY_RATIO_AMOUNT` (1H/24H, 24H/7D, 7D/30D) | Mức độ tập trung dòng tiền vào cửa sổ thời gian ngắn gần nhất. Nếu tỷ lệ tiến gần về 1.0, toàn bộ dòng tiền đổ dồn vào khoảng thời gian ngắn nhất. | `SUM_AMOUNT_1H / (SUM_AMOUNT_24H + ε)`, tương tự cho 24H/7D và 7D/30D | Phát hiện hành vi "Cash-out": tội phạm rửa tiền bắt buộc hành động cực nhanh trước khi ngân hàng đóng băng tài khoản. Tỷ lệ 24H/7D > 0.95 là tín hiệu Cash-out toàn bộ tài sản. |
-| `VELOCITY_RATIO_COUNT` (1H/24H, 24H/7D, 7D/30D) | Tương tự velocity amount nhưng đo trên số lượng giao dịch thay vì số tiền. | `COUNT_1H / (COUNT_24H + ε)`, tương tự cho 24H/7D và 7D/30D | 34% gian lận bắt đầu bằng micro-transaction testing (PwC, 2024): tội phạm chạy bot chuyển thử 10.000 VND liên tục. Velocity amount không phản ứng (số tiền nhỏ), nhưng velocity count đột biến. |
-
-#### Nhóm 3: Hành vi Thời gian & Ngủ đông (Temporal & Dormancy)
-
-Nhóm đặc trưng này khai thác yếu tố thời gian — bao gồm khoảng im lặng giữa các giao dịch, giờ giao dịch và hành vi ban đêm — để phát hiện tài khoản ngủ đông bị kích hoạt và các mô hình tấn công theo khung giờ.
+##### Nhóm 2: Đột biến Dòng tiền & Tần suất (Spike Detection)
+Hệ thống sử dụng các đặc trưng Spike (đột biến) đa tầng thay thế cho các tỷ lệ Velocity cũ nhằm bắt chính xác các hành vi dồn tiền dồn dập vào các khoảng thời gian cực ngắn so với thói quen nền dài hơn.
 
 | Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
 | :--- | :--- | :--- | :--- |
-| `DAYS_SINCE_LAST_TRANS` | Khoảng thời gian im lặng (ngày) giữa giao dịch hiện tại và giao dịch liền trước. | `(t_i − t_{i−1}) / 86400` (seconds → days). Fallback: ngày đăng ký IB hoặc ngày tạo tài khoản; mặc định 999. | Tội phạm thường thu mua tài khoản sinh viên và để "ngủ đông" 3-6 tháng nhằm lọt qua bộ lọc giám sát (Europol, 2023). Giá trị cao (hàng trăm ngày) kết hợp giao dịch lớn → xác suất mule account rất cao. |
-| `DAYS_AMOUNT_COMBINED` | Interaction feature kết hợp thời gian im lặng VÀ số tiền giao dịch. Logic: "Im lặng càng lâu + Chuyển đi càng nhiều = Rủi ro càng cao." | `ln(1 + DAYS_SINCE_LAST_TRANS) × ln(1 + TRANS_AMOUNT)` | Riêng từng yếu tố đều sinh False Positive cao; tổ hợp cả hai tạo tín hiệu rủi ro phi tuyến cực mạnh mà XGBoost khai thác hiệu quả. Nhóm bình thường có score < 30; nhóm bị cảnh báo thường > 40. |
-| `TRANS_HOUR` | Giờ giao dịch (0-23), đóng vai trò biến kiểm soát thời gian. | `hour(TRANS_DATE)` | Giao dịch ban đêm kết hợp các tín hiệu rủi ro khác tạo ra cường độ SHAP đơn lẻ cao nhất toàn hệ thống (+3.50 trung bình). |
-| `NIGHT_ANOMALY` | Mức độ bất thường khi giao dịch ban đêm (0h-5h) so với thói quen đêm lịch sử cá nhân. | `IS_NIGHT × (1 − HIST_NIGHT_RATIO)`. IS_NIGHT = 1 nếu TRANS_HOUR ∈ [0,5]. | Cơ chế "Frictionless Security": nếu khách hàng quen giao dịch đêm (bác sĩ, tài xế), HIST_NIGHT_RATIO cao → (1 − ratio) → 0, vô hiệu hóa cảnh báo đêm, bảo vệ trải nghiệm khách hàng hợp lệ. |
+| `SPIKE_1H_VS_24H` | Tỷ lệ bất thường kết hợp giữa số tiền và số lượng giao dịch phát sinh trong 1 giờ qua so với 24 giờ. | `(1.0 - v_amt_1h_24h) * (1.0 - v_cnt_1h_24h)` với `v_*` là tỷ lệ lượng/lượt giao dịch (1H / 24H) | Trị số tiến gần về 1.0 khi có một lượng giao dịch lớn và dồn dập xuất hiện trong 1 giờ qua mà trước đó 24 giờ hầu như không hoạt động (dấu hiệu botnet hoặc ATO vét tiền). |
+| `SPIKE_24H_VS_7D` | Tỷ lệ bất thường kết hợp giữa số tiền và số lượng giao dịch trong 24 giờ qua so với 7 ngày. | `(1.0 - v_amt_24h_7d) * (1.0 - v_cnt_24h_7d)` với `v_*` là tỷ lệ lượng/lượt giao dịch (24H / 7D) | Chỉ ra hành vi đột biến tiêu dùng/rút tiền tích lũy trong vòng 1 ngày qua so với thói quen của cả tuần. |
+| `SPIKE_7D_VS_30D` | Tỷ lệ bất thường kết hợp giữa số tiền và số lượng giao dịch trong 7 ngày qua so với 30 ngày. | `(1.0 - v_amt_7d_30d) * (1.0 - v_cnt_7d_30d)` với `v_*` là tỷ lệ lượng/lượt giao dịch (7D / 30D) | Phát hiện sự bất thường có tính chất chu kỳ ngắn hạn so với thói quen tháng. Rất hữu ích khi tội phạm chia nhỏ giao dịch ra vài ngày để tránh các rule 1h/24h. |
 
-#### Nhóm 4: An ninh & Xác thực (Security & Authentication)
-
-Nhóm đặc trưng này khai thác nhật ký sự kiện bảo mật (đổi mật khẩu, đổi PIN, cập nhật sổ địa chỉ) và lịch sử xác thực sinh trắc học để phát hiện dấu vân tay kinh điển của Account Takeover.
+##### Nhóm 3: Phân tích Thống kê & Xác suất Chuỗi (Statistical & Sequence)
+Nhóm đặc trưng phân tích sâu hành vi điều hướng ứng dụng và tính hợp lý của số tiền giao dịch dựa trên các quy luật toán học khách quan.
 
 | Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
 | :--- | :--- | :--- | :--- |
-| `HOURS_SINCE_SEC_EVENT` | Khoảng cách thời gian (giờ) giữa giao dịch hiện tại và sự kiện bảo mật gần nhất. Giá trị càng gần 0, xác suất ATO càng cao. | `(t_tx − t_last_sec) / 3600`. Mặc định 999 nếu không có sự kiện. | >70% các vụ ATO kết thúc bằng lệnh chuyển tiền trong vòng 60 phút sau khi đổi mật khẩu/PIN (Javelin Strategy, 2023). Chuỗi "đổi mật khẩu → chuyển tiền lớn ngay" là dấu vân tay kinh điển. |
-| `SEC_AMOUNT_COMBINED` | Interaction feature kết hợp khoảng cách sự kiện bảo mật VÀ số tiền giao dịch. Logic: "Đổi mật khẩu gần + Chuyển tiền lớn = ATO." | `ln(1 + TRANS_AMOUNT) / (ln(1 + HOURS_SINCE_SEC_EVENT) + ε)` | Giá trị cao khi TRANS_AMOUNT lớn VÀ HOURS_SINCE_SEC_EVENT nhỏ. 99% giao dịch có score < 5.0; nhóm ATO > 10.0. |
-| `HIST_BIOMETRIC_RATIO` | Tỷ lệ đăng nhập bằng sinh trắc học (FaceID, vân tay) trong toàn bộ lịch sử. Đóng vai trò biến kiểm soát — thiết lập baseline xác thực cá nhân. | `Σ login_biometric / (total_logins + ε)` | Nếu khách hàng có lịch sử 99% dùng FaceID nhưng hôm nay đăng nhập bằng Password trên thiết bị lạ → mô hình nhận diện đây là ATO. Feature cung cấp bối cảnh cho các feature khác. |
+| `BENFORD_DEV` | Độ lệch phân phối chữ số đầu tiên của các khoản tiền giao dịch so với định luật Benford. | KL-Divergence: `Σ p_d * ln(p_d / q_d)`, với `q_d = log10(1 + 1/d)` | Khi tội phạm chia nhỏ dòng tiền (structuring) để tránh ngưỡng báo động, phân bố chữ số đầu tiên sẽ lệch nghiêm trọng so với tự nhiên. Chỉ số cao (>0.15) cho thấy sự sắp đặt dòng tiền chủ quan. |
+| `ACTIVITY_SEQ_RARITY` | Điểm số độ hiếm của chuỗi thao tác trên ứng dụng di động dựa trên mô hình Markov bậc 2. | Xác suất chuyển tiếp bậc 2 smoothed bằng nội suy backoff: `0.7*P_2nd + 0.2*P_1st + 0.1*P_global`. | Phát hiện các kịch bản bot tự động hoặc kẻ gian điều hướng nhanh để đổi mật khẩu rồi chuyển tiền ngay. Chuỗi thao tác bất thường sẽ tạo ra log-probability âm rất sâu. |
 
-#### Nhóm 5: Phân tích Thống kê & Chuỗi (Statistical & Sequence)
+#### 3.3.2. Các đặc trưng phụ trợ phục vụ bộ lọc Rule-based (Tier 1)
 
-Nhóm đặc trưng này sử dụng các phương pháp thống kê (Định luật Benford) và mô hình xác suất chuỗi (Markov bậc 2) để phát hiện hành vi cấu trúc hóa giao dịch và các luồng thao tác bất thường trên ứng dụng.
+Các đặc trưng này được nạp vào để chạy hệ thống luật cứng ở Tier 1, giúp đưa ra quyết định Block hoặc Bypass nhanh chóng trước khi dữ liệu đi vào mô hình ML:
 
-| Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
-| :--- | :--- | :--- | :--- |
-| `BENFORD_DEV` | Độ lệch giữa phân bố chữ số đầu tiên (1-9) của tất cả số tiền giao dịch so với phân bố lý thuyết Benford. Chỉ tính khi khách hàng có ≥ 50 giao dịch. | KL-Divergence: `D_KL(P ‖ Q) = Σ p_d · ln(p_d / q_d)`, với `q_d = log₁₀(1 + 1/d)` | Khi tội phạm lách AML bằng cách chia nhỏ tiền (9.9 triệu, 9.8 triệu để né ngưỡng 10 triệu), phân bố chữ số đầu tiên lệch nghiêm trọng (Nigrini, 2012). Khách hàng hợp pháp có BENFORD_DEV < 0.05; khách hàng structuring > 0.15. |
-| `ACTIVITY_SEQ_RARITY` | Mức độ hiếm của chuỗi hoạt động kỹ thuật số. Sử dụng mô hình Chuỗi Markov bậc 2 với nội suy backoff để tính xác suất chuyển tiếp. | `P_interp(a₃|a₁,a₂) = 0.7·P_2nd + 0.2·P_1st + 0.1·P_global`. Score = trung bình log-probability trên toàn chuỗi. | Phát hiện botnet/script tự động (Chandola et al., 2009). Phiên bình thường: LOGIN → QUERY → TRANSFER → LOGOUT. Phiên bất thường: LOGIN → PASSWORD_CHANGE → TRANSFER_OUTSIDE → LOGOUT. Đóng vai trò kép: biến độc lập cho XGBoost và quy tắc bypass tại Tier 1. |
+*   `DAYS_SINCE_LAST_TRANS` (Đo khoảng thời gian im lặng ngày): Sử dụng trong `DormancyWakeupRule` để phát hiện tài khoản "ngủ đông" bị kích hoạt chuyển tiền lớn ra ngoài.
+*   `HOURS_SINCE_SEC_EVENT` (Đo số giờ kể từ sự kiện bảo mật gần nhất): Sử dụng trong `ATOPanicRule` để phát hiện việc chuyển tiền ngay sau khi đổi mật khẩu/PIN.
+*   `LIMIT_UTILIZATION_VELOCITY` (Tốc độ vét hạn mức tín dụng MoM): Sử dụng trong `CreditCardBustOutRule` để chặn vét thẻ tín dụng tẩu tán tài sản.
+*   `TRANS_HOUR_PROB` (Xác suất giờ giao dịch cá nhân): Sử dụng trong `HourlyAnomalyRule` để phát hiện giao dịch phát sinh vào khung giờ lạ của khách hàng.
+*   `COUNT_1H`, `COUNT_24H` (Lượt giao dịch trượt): Sử dụng trong `VelocityBypassRule` để bypass các giao dịch thưa thớt, an toàn.
 
-#### Nhóm 6: Phân loại & Nhân khẩu (Categorical & Demographic)
-
-Nhóm biến kiểm soát thiết lập Cohort Baseline — giúp mô hình phân tầng rủi ro theo bối cảnh nhân khẩu học và kênh giao dịch, thay vì áp dụng ngưỡng chung.
-
-| Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
-| :--- | :--- | :--- | :--- |
-| `AGE_GROUP` & `Occupation_Group` | Phân nhóm khách hàng theo tuổi (Young, Middle, Old) và nghề nghiệp. | Label Encoding từ năm sinh và nhãn nghề nghiệp. | Sinh viên và người già là nhóm dễ bị lừa bán tài khoản làm Mule Account nhất (NHNN Thông tư 09/2020). Giao dịch 100 triệu của sinh viên thất nghiệp có rủi ro cao hơn rất nhiều so với của doanh nhân. |
-| `TRANS_LV1` & `TRANS_LV2` | Phân loại giao dịch theo hệ thống phân cấp 2 tầng. TRANS_LV1 = nhóm lớn (Transfer, Payment); TRANS_LV2 = chi tiết (Within_bank, Outside_bank). | Label Encoding. | Giao dịch "Transfer Outside_bank" rủi ro cao nhất vì tiền khi rời hệ thống ngân hàng gốc gần như không thể thu hồi. Outside_bank chiếm ~35% tổng giao dịch nhưng 76.6% cảnh báo. |
-| `CUSTOMER_AGE` & `TENURE_DAYS` | CUSTOMER_AGE = tuổi tại thời điểm giao dịch. TENURE_DAYS = số ngày kể từ khi tạo tài khoản. | `year(t_tx) − year(DATE_OF_BIRTH)` và `t_tx − t_account_creation` (days). | Tài khoản mới mở (tenure thấp) kết hợp giao dịch lớn là dấu hiệu rủi ro cao: tội phạm thường mở hoặc mua tài khoản mới, sử dụng ngay trong 30 ngày đầu rồi bỏ. |
-
-#### Nhóm 7: Thiết bị & Hạ tầng kỹ thuật (Device & Infrastructure)
-
-Nhóm đặc trưng mới khai thác thông tin thiết bị (`Device_ID_Hash`) và địa chỉ IP (`IP_Address_Proxy`) — hai chiều dữ liệu mà các nhóm feature gốc chưa bao phủ.
-
-| Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
-| :--- | :--- | :--- | :--- |
-| `NEW_DEVICE_FLAG` | Cờ nhị phân xác định giao dịch hiện tại có đang thực hiện trên thiết bị mà khách hàng chưa từng sử dụng hay không. | `1` nếu `cumcount(CUSTOMER, Device_ID_Hash) = 0`; `0` nếu ngược lại. | >80% các vụ ATO bắt đầu từ việc đăng ký thiết bị mới (Javelin, 2023). Thiết bị mới xuất hiện gấp 2.8 lần trong nhóm cảnh báo (48.9%) so với nhóm bình thường (~17.5%). Tương tác mạnh nhất: thiết bị mới + tài khoản ngủ đông + tiền lớn = ATO kinh điển. |
-| `IP_HOPPING_VELOCITY` | Số lượng địa chỉ IP duy nhất mà một thiết bị sử dụng trong cửa sổ trượt 3 giờ. | Đếm số IP duy nhất trong `W_3h(i)` trên cùng `Device_ID_Hash`. Giá trị = 1 là bình thường; > 3 trong 3 giờ là dấu hiệu proxy rotation. | Tội phạm mạng sử dụng công cụ tự động xoay vòng IP (Residential Proxy, VPN Chaining) để lách bộ quy tắc địa lý. Mã độc GoldPickaxe (Group-IB, 2024) nhắm vào khách hàng ngân hàng Việt Nam có khả năng tự động xoay IP trên thiết bị bị nhiễm. |
-
-#### Nhóm 8: Tín dụng & Cấu trúc hóa Giao dịch (Credit & Structuring)
-
-Nhóm đặc trưng mới khai thác bảng `Data_Card` — mở rộng phạm vi giám sát từ chỉ "giao dịch" sang "tín dụng" và lần đầu tiên nhìn vào dòng tiền vào (inbound) thay vì chỉ dòng tiền ra (outbound).
-
-| Tên Đặc trưng | Định nghĩa | Measurement | Ý nghĩa trong mô hình |
-| :--- | :--- | :--- | :--- |
-| `LIMIT_UTILIZATION_VELOCITY` | Tốc độ tăng trưởng tỷ lệ sử dụng hạn mức thẻ tín dụng theo tháng (Month-over-Month Velocity). Giá trị dương cao = đang vét hạn mức với tốc độ bất thường. | `utilization_t = OUTSTANDING_BAL / LIMIT_AMT`; `velocity_t = utilization_t − utilization_{t−1}`; lấy `max(velocity)` trên toàn bộ lịch sử. | Phát hiện gian lận Bust-out (FBI, 2023 — thiệt hại $6 tỷ/năm): tội phạm nuôi uy tín tín dụng 3-6 tháng (utilization 5-10%), sau đó vét sạch hạn mức trong 1 tháng (velocity +0.5 đến +0.56) rồi biến mất. 507 khách hàng (1.45%) có velocity > 0.5. |
-| `STRUCTURING_OVERPAYMENT_FLAG` | Cờ nhị phân xác định hành vi nạp tiền vượt quá dư nợ thẻ tín dụng thông qua nhiều lần thanh toán chia nhỏ — dấu hiệu rửa tiền qua overpayment. | `1` nếu `Σ REPAY_AMOUNT_30d > OUTSTANDING_BAL_CREDIT` VÀ `số lần nạp ≥ 2`; `0` nếu ngược lại. | Kỹ thuật rửa tiền Credit Card Overpayment Laundering (GAO, 2002; FATF, 2021): chia nhỏ tiền bẩn nạp vào thẻ vượt quá dư nợ, tạo "số dư có", sau đó yêu cầu hoàn tiền → tiền đã được hợp thức hóa. 1.099 khách hàng (31.1% nhóm có thẻ) có dấu hiệu nạp dư. |
-
-#### Tổng kết Biến đổi
-Bộ pipeline hoàn thiện đưa ra 25 đặc trưng số hóa phân bố trên 8 nhóm chức năng, sẵn sàng cho các mô hình. Đối với các trường dữ liệu phân loại (Categorical: `TRANS_LV1`, `TRANS_LV2`, `DAY_OF_WEEK`, `CLIENT_SEX`, `EB_REGISTER_CHANNEL`, `VERIFY_METHOD`, `Occupation_Group`), hệ thống áp dụng kỹ thuật **Label Encoding** để ánh xạ sang dạng số (mapping) cùng với việc gán nhãn `UNKNOWN` cho các giá trị bị thiếu (Null/Blank) nhằm giúp các thuật toán (cây quyết định hoặc Isolation Forest) có thể học được mô hình từ các bản ghi không hoàn chỉnh này.
+#### 3.3.3. Tổng kết bộ đặc trưng
+Bộ pipeline hoàn thiện bao gồm **8 đặc trưng rủi ro nạp trực tiếp vào mô hình ML (Tier 2)** và **5 đặc trưng bổ trợ dùng cho bộ lọc Rule-based (Tier 1)**. Sự phân chia này giúp hệ thống đạt độ chính xác cao, đẩy nhanh tốc độ suy luận của mô hình XGBoost và tối ưu hóa hiệu năng xử lý đặc trưng trên tập dữ liệu lớn.
 
 ---
 
 ## Phần IV: Huấn luyện Mô hình (Phase 3 — PU Learning)
 
-Sau khi hoàn thành 25 đặc trưng số hóa, hệ thống tiến hành huấn luyện mô hình phân loại giao dịch bất thường. Tuy nhiên, bộ dữ liệu mẫu không cung cấp bất kỳ nhãn gian lận đã xác nhận nào — đây là thách thức cốt lõi quyết định toàn bộ chiến lược huấn luyện.
+Sau khi hoàn thành thiết lập bộ đặc trưng số hóa, hệ thống tiến hành huấn luyện mô hình phân loại giao dịch bất thường. Tuy nhiên, bộ dữ liệu mẫu không cung cấp bất kỳ nhãn gian lận đã xác nhận nào — đây là thách thức cốt lõi quyết định toàn bộ chiến lược huấn luyện.
 
 ### 4.1. Vấn đề: Không có nhãn gian lận
 
@@ -620,84 +597,82 @@ Kết quả này khẳng định kiến trúc Autoencoder tích hợp EWC cho ph
 
 ## Phần VII: Kết quả & Phân tích
 
-Sau khi đưa toàn bộ 5,000 giao dịch mẫu qua hệ thống 3 Tầng (Tiered Inference) với 25 đặc trưng cấu trúc mới, Pipeline V3 đã đem lại những kết quả đo lường và phát hiện sâu sắc, minh chứng cho thiết kế kết hợp giữa Rule-based và xAI.
+Sau khi đưa toàn bộ **900.000 giao dịch** qua hệ thống phân tầng rủi ro tích hợp (Hierarchical Routing Pipeline) với bộ đặc trưng rủi ro tối ưu, hệ thống đã đem lại kết quả đo lường và phát hiện vượt trội, chứng minh hiệu quả thực tế của việc kết hợp giữa Rule-based và mô hình ML học máy có hiệu chỉnh (NNPU-C XGBoost).
 
 ### 7.1. Thống kê tổng quan (Kết quả Rule-based & ML)
-Quá trình phân tầng định tuyến đã thể hiện hiệu suất sàng lọc rõ rệt:
-- **Tổng giao dịch đánh giá:** 5,000
-- **Tier 1 (Safe Bypass):** 1,479 giao dịch (29.58%) được lọc bỏ hoàn toàn an toàn nhờ các luật BYPASS (SequenceRarityRule, VelocityBypassRule, LowRiskChannelBypassRule), tiết kiệm ngay lập tức ~30% chi phí tính toán mô hình máy học nặng.
-- **Tier 2 (ML XGBoost):** 3,521 giao dịch vùng xám tiếp tục được phân tích rủi ro với đầy đủ 25 đặc trưng số hóa.
-- **Tier 3 (Anomaly Alerts):** Mô hình phát hiện và gắn cờ **94 giao dịch bất thường** (tương đương tỷ lệ 1.88%) từ 64 khách hàng duy nhất. Điểm Anomaly Score trung bình đạt 0.8244. Số lượng cảnh báo này là rất sát với tỷ lệ gian lận và rủi ro thực tế trong hệ thống ngân hàng thương mại.
+Quá trình phân tầng định tuyến đã thể hiện hiệu suất sàng lọc rõ rệt trên quy mô dữ liệu lớn:
+- **Tổng giao dịch đánh giá:** 900.000 giao dịch
+- **Tier 1 (Safe Bypass):** Lọc bỏ an toàn **547.100 giao dịch (60,79%)** nhờ các quy tắc bypass tự động (LowRiskChannelBypassRule, SequenceRarityRule, VelocityBypassRule, SmallAmountBypassRule), tiết kiệm ngay lập tức hơn 60% chi phí tính toán cho mô hình máy học.
+- **Tier 1 (Forced Fraud Block):** Ngăn chặn lập tức **2.719 giao dịch (0,30%)** có dấu hiệu gian lận rõ ràng (Smoking gun) thông qua các quy tắc chặn cứng (DormancyWakeupRule, ATOPanicRule, HourlyAnomalyRule, CreditCardBustOutRule).
+- **Tier 2 (ML XGBoost):** **350.181 giao dịch vùng xám** còn lại được định tuyến vào mô hình ML để phân tích chuyên sâu với 8 đặc trưng cốt lõi.
+- **Tier 3 (Flagged Anomaly Alerts):** Mô hình ML phát hiện và gắn cờ rủi ro thêm **4.288 giao dịch** (tương đương 1,22% phân khúc vùng xám).
+- **Tổng số cảnh báo gian lận:** **7.007 giao dịch** bị chặn hoặc gắn cờ cảnh báo trên toàn hệ thống (tỷ lệ **0,78%** trên tổng số giao dịch), hoàn toàn phù hợp với phân bố rủi ro thực tế trong vận hành ngân hàng thương mại.
 
 ### 7.2. Phân bố rủi ro theo nhóm Feature
-Dựa trên phân tích 94 cảnh báo gian lận, sự tập trung rủi ro lộ diện rất rõ ràng, trùng khớp với hành vi tội phạm tài chính:
-- **Về số tiền:** Giao dịch bất thường trung bình là 29,852,265 VND, cao hơn rất nhiều so với trung vị 5,000,000 VND của hệ thống. Tội phạm thường có xu hướng chuyển số tiền lớn nhất có thể trước khi bị phát hiện và phong tỏa tài khoản.
-- **Về thiết bị:** 62.77% vụ việc xảy ra trên thiết bị iOS, 36.17% trên Android và chỉ 1.06% trên nền tảng Web.
-- **Về kênh chuyển tiền:** Kênh **Outside_bank** (chuyển tiền liên ngân hàng/ra ngoài hệ thống) chiếm đến **76.60%** tổng số cảnh báo. Điều này phản ánh chính xác logic lừa đảo (Mule Account / Account Takeover) khi kẻ gian luôn tìm cách tẩu tán tài sản ra khỏi ngân hàng gốc để dòng tiền không thể thu hồi được (irreversible). Trong khi đó, các giao dịch nội bộ (Within_bank) chỉ chiếm 14.89%.
+Dựa trên phân tích 7.007 giao dịch bất thường bị phát hiện, sự tập trung rủi ro lộ diện rất rõ ràng:
+- **Về số tiền:** Giao dịch bất thường trung bình là **91.181.937 VND** (với trung vị là **33.000.000 VND**), cao hơn rất nhiều so với trung vị **640.000 VND** của hệ thống, phản ánh xu hướng tẩu tán tài sản lớn khẩn cấp của tội phạm.
+- **Về kênh chuyển tiền:** Kênh **Outside_bank** (chuyển tiền ra ngoài hệ thống ngân hàng gốc) chiếm đến **77,79%** tổng số cảnh báo. Điều này phản ánh chính xác hành vi tẩu tán dòng tiền bất hợp pháp (Mule Account / ATO) để dòng tiền không thể thu hồi. Trong khi đó, các giao dịch nội bộ (Within_bank) chiếm **14,37%**.
 
 ### 7.3. Đóng góp Đặc trưng (Ranked SHAP Contributors)
-Dựa trên giải thích TreeSHAP của 94 cảnh báo, hệ thống ghi nhận tần suất xuất hiện của Top 5 đặc trưng mang tính chất quyết định cao nhất:
+Dựa trên giá trị giải thích TreeSHAP trung bình trên toàn bộ các cảnh báo bất thường, mức độ đóng góp của 8 đặc trưng ML được xếp hạng như sau:
 
-| Đặc trưng (Feature) | Tần suất Top SHAP | Giải thích logic thực tế |
-| :--- | :--- | :--- |
-| **NEW_DEVICE_FLAG** | 46 alerts (48.94%) | Dấu hiệu số 1 của Account Takeover (ATO). Kẻ gian lấy cắp tài khoản luôn phải đăng nhập trên thiết bị lạ chưa từng được nạn nhân sử dụng trước đó. |
-| **DAYS_AMOUNT_COMBINED** | 44 alerts (46.81%) | Bắt bài kịch bản Money Mule: Các tài khoản sinh viên được mua lại, để "ngủ đông" rất lâu (DAYS_SINCE cao) tránh giám sát, nay đột ngột giao dịch với số tiền lớn (TRANS_AMOUNT cao). |
-| **BALANCE_COVERAGE_RATIO** | 33 alerts (35.11%) | Phản ánh tính chất "Dòng tiền qua tay". Số tiền chuyển đi vượt quá nhiều lần số dư tiết kiệm trung bình lịch sử — tiền bẩn vừa được bơm vào lập tức bị tẩu tán. |
-| **TRANS_HOUR** | 29 alerts (30.85%) | Khung giờ nửa đêm đến rạng sáng (0h - 5h) — thời điểm nạn nhân mất cảnh giác nhất để xử lý thông báo biến động số dư hoặc khi hệ thống botnet tự động xả tiền. |
-| **TRANS_AMOUNT_VS_30D_AVG_RATIO** | 26 alerts (27.66%) | So sánh sự thay đổi đột ngột so với baseline ngắn hạn, vạch trần hành vi "rút mẻ lưới cuối" lớn gấp chục lần thói quen chi tiêu thông thường trong tháng. |
+| Hạng | Đặc trưng (Feature) | Trung bình SHAP Value | Tần suất xuất hiện ở Top 3 | Giải thích logic thực tế |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | **TRANS_AMOUNT_Z_SCORE** | 5.802 | 4.244 cảnh báo (98,97%) | Mức độ lệch chuẩn chi tiêu cá nhân. Số tiền giao dịch vượt nhiều lần độ lệch chuẩn lịch sử cá nhân là chỉ báo rủi ro số 1. |
+| 2 | **TRANS_AMOUNT_VS_30D_AVG_RATIO** | 3.976 | 4.061 cảnh báo (94,71%) | So sánh với thói quen chi tiêu trung bình ngắn hạn 30 ngày qua, vạch trần hành vi đột biến rút tiền khẩn cấp. |
+| 3 | **BALANCE_COVERAGE_RATIO** | 0.764 | 2.044 cảnh báo (47,67%) | Số tiền giao dịch vượt nhiều lần số dư trung bình lịch sử tài khoản (tín hiệu tài khoản mule nhận tiền rồi chuyển đi ngay). |
+| 4 | **BENFORD_DEV** | 0.322 | 991 cảnh báo (23,11%) | Độ lệch phân phối chữ số đầu tiên (Benford's Law) chỉ ra hành vi chia nhỏ số tiền (structuring) nhằm né các hạn mức giám sát. |
+| 5 | **SPIKE_1H_VS_24H** | 0.104 | 653 cảnh báo (15,23%) | Đột biến giao dịch trong 1 giờ qua so với 24 giờ, bắt trúng hành vi tấn công botnet hoặc ATO tẩu tán dồn dập. |
+| 6 | **SPIKE_24H_VS_7D** | 0.021 | 248 cảnh báo (5,78%) | Đột biến giao dịch trong 24 giờ qua so với 7 ngày qua, cảnh báo sự gia tăng tần suất giao dịch ngắn hạn đột xuất. |
+| 7 | **ACTIVITY_SEQ_RARITY** | 0.014 | 295 cảnh báo (6,88%) | Độ hiếm chuỗi thao tác (Markov bậc 2), bắt bài các hành vi điều hướng ứng dụng bất thường hoặc tự động hóa. |
+| 8 | **SPIKE_7D_VS_30D** | 0.014 | 328 cảnh báo (7,65%) | Đột biến giao dịch trong 7 ngày qua so với 30 ngày, phát hiện rủi ro phân tán tiền chu kỳ tuần. |
 
 ### 7.4. Tương tác Đặc trưng Độc hại (Toxic Feature Interactions)
 Các kịch bản gian lận hiện đại rất hiếm khi bộc lộ qua một biến đơn lẻ. SHAP Interaction ghi nhận các cặp tương tác mạnh mẽ tạo ra hiệu ứng cộng hưởng rủi ro phi tuyến:
-
-1. **TRANS_HOUR × BALANCE_COVERAGE_RATIO (45.74% alerts):** Giao dịch vét sạch số tiền (vượt xa số dư tích lũy) lại được thực hiện vào đúng khung giờ đêm khuya.
-2. **NEW_DEVICE_FLAG × DAYS_AMOUNT_COMBINED (43.62% alerts):** Tổ hợp "chết người" của ATO kết hợp Mule: Tài khoản để không hoạt động một thời gian dài, nay bị đăng nhập trên một thiết bị lạ và lập tức chuyển đi số tiền rất lớn.
-3. **DAYS_SINCE_LAST_TRANS × BALANCE_COVERAGE_RATIO (26.60% alerts):** Tài khoản ngủ đông bất ngờ thức giấc và chuyển khoản một lượng tiền hoàn toàn lệch pha với số dư trung bình lịch sử của chính họ.
-4. **TRANS_HOUR × IP_HOPPING_VELOCITY (15.96% alerts):** Một thiết bị liên tục xoay vòng IP (sử dụng proxy dân cư hoặc botnet) vào lúc nửa đêm, dấu hiệu không thể chối cãi của các chiến dịch tấn công tự động (ví dụ mã độc GoldPickaxe) để vượt qua bộ lọc rào cản địa lý.
+1. **TRANS_AMOUNT_Z_SCORE × TRANS_AMOUNT_VS_30D_AVG_RATIO (92,37% alerts):** Mức độ lệch chuẩn của giao dịch hiện tại kết hợp sự đột biến so với trung bình 30 ngày ngắn hạn (cảnh báo nguy cơ vét sạch tài khoản nhanh).
+2. **TRANS_AMOUNT_Z_SCORE × BALANCE_COVERAGE_RATIO (53,99% alerts):** Sự kết hợp giữa số tiền giao dịch lệch chuẩn lớn và số tiền này chiếm phần lớn/vượt số dư trung bình tích lũy lịch sử (dấu vết tài khoản mule nhận tiền bẩn lớn rồi tẩu tán ngay).
+3. **BALANCE_COVERAGE_RATIO × TRANS_AMOUNT_VS_30D_AVG_RATIO (48,76% alerts):** Số tiền giao dịch vượt nhiều lần số dư trung bình lịch sử cộng hưởng với việc vượt mức chi tiêu 30 ngày gần nhất.
+4. **BENFORD_DEV × TRANS_AMOUNT_VS_30D_AVG_RATIO (31,30% alerts):** Độ lệch Benford cộng hưởng với đột biến giao dịch ngắn hạn 30 ngày, cho thấy hành vi chia nhỏ số tiền chuyển liên tục nhằm trốn tránh hệ thống cảnh báo.
+5. **TRANS_AMOUNT_Z_SCORE × SPIKE_1H_VS_24H (26,42% alerts):** Tổ hợp số tiền giao dịch lệch chuẩn cực cao phát sinh ngay khi xuất hiện đột biến tần suất/lưu lượng trong vòng 1 giờ qua (dấu vết của các cuộc tấn công ATO vét tiền khẩn cấp).
 
 ### 7.5. Ví dụ Counterfactual Recourse
-Explainable AI (xAI) không chỉ giới hạn ở việc tìm ra lỗi, mà còn phải đề xuất được hướng giải quyết (Recourse). Đối với các giao dịch bị XGBoost đánh dấu rủi ro cao ($P > \tau$), hệ thống dùng thuật toán Binary Search để rà soát thay đổi tối thiểu nhằm hạ rủi ro xuống dưới ngưỡng cảnh báo.
-
-**Ví dụ một Case Study trên thực tế mô phỏng:**
-- Một khách hàng có mức chi tiêu bình quân `HIST_AVG_TRANS_AMOUNT` là 5 triệu VND.
-- Hôm nay khách hàng thực hiện lệnh chuyển đi **55 triệu VND** (Z-Score > 10). Hệ thống chấm điểm rủi ro $P(\text{fraud}|x) = 0.92$ (vượt ngưỡng $\tau$). Lệnh chuyển bị gắn cờ và chờ duyệt.
-- **Cơ chế lan truyền nhân quả (Causal Propagation):** Khi mô phỏng giảm thử `TRANS_AMOUNT`, thuật toán của hệ thống sẽ tự động tính toán lại sự sụt giảm của các biến phụ thuộc như `TRANS_AMOUNT_Z_SCORE`, `BALANCE_COVERAGE_RATIO`, `DAYS_AMOUNT_COMBINED` và tái đánh giá lại điểm số mô hình.
-- **Đề xuất Counterfactual xAI:** *"Giao dịch sẽ chuyển về trạng thái an toàn nếu số tiền giảm xuống còn tối đa 15,000,000 VND."*
-- **Quyết định nghiệp vụ:** Dựa trên tư vấn này, thay vì đóng băng thẻ gây gián đoạn trải nghiệm, ngân hàng có thể tự động gửi thông báo yêu cầu khách hàng: (1) chia nhỏ mức thanh toán dưới 15 triệu, hoặc (2) thực hiện xác thực sinh trắc học Video-Call tăng cường nếu muốn chuyển thẳng 55 triệu.
+Explainable AI (xAI) giúp đề xuất hướng giải quyết (Recourse) tối thiểu để đưa giao dịch về trạng thái an toàn:
+- Một khách hàng có mức chi tiêu bình quân `HIST_AVG_TRANS_AMOUNT` là 2,4 triệu VND, hôm nay khách hàng thực hiện lệnh chuyển đi **50 triệu VND** (Z-Score > 8). Hệ thống chấm điểm rủi ro $P(\text{fraud}|x) = 1.00$ (vượt ngưỡng).
+- **Cơ chế lan truyền nhân quả (Causal Propagation):** Khi mô phỏng giảm thử `TRANS_AMOUNT`, thuật toán sẽ tự động tính toán lại sự sụt giảm của các biến phụ thuộc như `TRANS_AMOUNT_Z_SCORE`, `BALANCE_COVERAGE_RATIO`, `SPIKE_1H_VS_24H`, `TRANS_AMOUNT_VS_30D_AVG_RATIO` và tái đánh giá lại điểm số mô hình.
+- **Đề xuất Counterfactual xAI:** *"Giao dịch sẽ chuyển về trạng thái an toàn nếu số tiền giảm xuống còn tối đa 14.500.000 VND."*
+- **Quyết định nghiệp vụ:** Ngân hàng có thể tự động gửi thông báo yêu cầu khách hàng chia nhỏ mức thanh toán dưới 14.5 triệu, hoặc bắt buộc xác thực sinh trắc học FaceID tăng cường nếu muốn chuyển thẳng 50 triệu.
 
 ### 7.6. Hiệu suất xử lý thực tế
-Một trong những điểm sáng nhất của kiến trúc Pipeline V3 là tốc độ vận hành thực tế. Tổng thời gian xử lý toàn bộ quá trình phân tầng (Tier 1 đến Tier 3) cho 5,000 giao dịch chỉ mất **6,931 ms** (tương đương khoảng **~1.4 mili-giây cho một giao dịch**).
-
-Tốc độ độ trễ cực thấp này có ý nghĩa tiên quyết đối với hệ thống Anti-Fraud thời gian thực (Real-time Streaming). Nó cho phép hệ thống phòng vệ can thiệp vào giữa luồng thanh toán tại core-banking của ngân hàng để phân tích rủi ro mà không gây ra bất kỳ sự suy giảm hiệu năng nào mà người dùng cuối (end-user) có thể cảm nhận được trong quá trình bấm nút chuyển tiền trên ứng dụng di động.
+Một trong những điểm sáng nhất của kiến trúc Pipeline V3 là tốc độ vận hành thực tế. Tổng thời gian xử lý toàn bộ quá trình phân tầng cho 900.000 giao dịch chỉ mất **36.524 ms** (tương đương khoảng **~0,04 mili-giây cho một giao dịch**).
+Tốc độ độ trễ cực thấp này cho phép hệ thống phòng vệ can thiệp vào giữa luồng thanh toán tại core-banking của ngân hàng để phân tích rủi ro thời gian thực (real-time) mà không gây ra bất kỳ sự suy giảm trải nghiệm nào của người dùng.
 
 ---
 
 ## Phần VIII: Giá trị Kinh doanh & Đề xuất
 
-Một hệ thống phòng chống gian lận (Anti-Fraud) thành công không chỉ được đo lường bằng số lượng giao dịch bị chặn, mà còn phải cân bằng hoàn hảo giữa rủi ro (Risk) và Tăng trưởng (Growth). Dưới góc độ quản trị điều hành của một ngân hàng thương mại tại Việt Nam, kiến trúc Pipeline 3 tầng kết hợp xAI này mang lại những giá trị chiến lược to lớn.
+Một hệ thống phòng chống gian lận (Anti-Fraud) thành công luôn cân bằng hoàn hảo giữa rủi ro (Risk) và Tăng trưởng (Growth). Kiến trúc Pipeline 3 tầng kết hợp xAI này mang lại những giá trị chiến lược to lớn dưới góc độ vận hành của ngân hàng thương mại tại Việt Nam.
 
 ### 8.1. Bảo vệ uy tín ngân hàng và Tối ưu chi phí nguồn vốn
-- **Giảm thiểu báo động giả (False Positives):** Hệ thống rule-based truyền thống thường có tỷ lệ báo động giả rất cao (5-10%), gây đóng băng oan tài khoản và lãng phí nguồn lực xác minh. Kiến trúc phân tầng và mô hình Machine Learning giúp giảm tỷ lệ rủi ro (Anomaly Flagging Rate) xuống mức thực tế ~1.88% (với sai số kiểm soát False Positive ước tính chỉ quanh mức 2.42%). Điều này đảm bảo ngân hàng không đánh mất khách hàng tốt do những phiền toái không đáng có.
-- **Bảo vệ dòng vốn thất thoát (Nhắm trúng Transfer Outside):** Sự tập trung mũi nhọn vào kênh giao dịch rủi ro cao (76.6% cảnh báo thuộc về kênh chuyển ra ngoài - Outside_bank) giúp chặn đứng dòng tiền "không thể thu hồi" (irreversible). Trong bối cảnh lừa đảo không gian mạng gia tăng, việc bảo vệ tài sản người dùng cũng chính là bảo vệ chỉ số tín nhiệm (Trust Index) và huy động vốn của ngân hàng.
+- **Giảm thiểu báo động giả (False Positives):** Việc tối ưu hóa mô hình ML giúp giảm tỷ lệ cảnh báo rủi ro (Anomaly Flagging Rate) xuống mức thực tế **0,78%** trên toàn hệ thống (7.007 cảnh báo / 900.000 giao dịch), hạn chế tối đa báo động giả làm phiền khách hàng.
+- **Bảo vệ dòng vốn thất thoát:** Sự tập trung mũi nhọn vào kênh giao dịch rủi ro cao (**77,79%** cảnh báo thuộc về kênh chuyển ra ngoài - Outside_bank) giúp chặn đứng dòng tiền không thể thu hồi (irreversible), gia tăng uy tín của ngân hàng đối với người dùng.
 
 ### 8.2. Nâng cao trải nghiệm khách hàng (Frictionless Security)
-- **Bảo mật không ma sát:** Trong kỷ nguyên số, khách hàng luôn đòi hỏi giao dịch "chạm là thanh toán". Nhờ bộ lọc Tier 1 Bypass, hệ thống đã tự động cho qua gần 30% giao dịch có mức độ rủi ro cực thấp (như thanh toán hóa đơn, nạp thẻ cào) mà không cần gọi đến mô hình phân tích nặng nề. Người dùng hoàn toàn không cảm nhận được độ trễ (Zero-latency Experience).
-- **Phản ứng linh hoạt nhờ Counterfactual:** Thay vì tư duy "Chặn cứng" (Hard-block) như hệ thống cũ, sức mạnh của Counterfactual Recourse (xAI) cho phép ngân hàng đề xuất giải pháp thay thế. Ví dụ: Nếu một giao dịch chuyển 50 triệu bị đánh dấu rủi ro quá ngưỡng do thực hiện ban đêm trên thiết bị lạ, thay vì khóa tài khoản, hệ thống có thể bật cửa sổ yêu cầu khách hàng **"Xác thực bổ sung qua FaceID/Video-Call theo Quyết định 2345/QĐ-NHNN"** hoặc gợi ý chia nhỏ giao dịch. Đây là cách tiếp cận lấy khách hàng làm trung tâm (Customer-Centric).
+- **Bảo mật không ma sát:** Nhờ bộ lọc Tier 1 Bypass, hệ thống tự động cho qua **60,79%** giao dịch (547.100 / 900.000) có mức độ rủi ro cực thấp mà không cần gọi đến mô hình phân tích nặng nề, đem lại trải nghiệm Zero-latency cho người dùng.
+- **Phản ứng linh hoạt nhờ Counterfactual:** Thay vì tư duy khóa cứng tài khoản, sức mạnh của Counterfactual Recourse (xAI) cho phép ngân hàng đề xuất giải pháp xác thực FaceID tăng cường linh hoạt theo Quyết định 2345/QĐ-NHNN hoặc gợi ý chia nhỏ giao dịch.
 
 ### 8.3. Tăng hiệu suất của khối Tuân thủ & Kiểm soát rủi ro (Compliance & AML)
-- Quá trình điều tra gian lận truyền thống đòi hỏi Chuyên viên phân tích (Analyst) phải tra cứu thủ công qua hàng chục bảng dữ liệu (log đăng nhập, lịch sử giao dịch, biến động số dư) để tìm kiếm manh mối. 
-- Tính năng dịch các giá trị SHAP Value thành **narrative tự nhiên (Natural Language Explanations)** cung cấp cho Analyst một "hồ sơ tóm tắt tội phạm" ngay trên màn hình cảnh báo (Ví dụ: *"Giao dịch rủi ro do tài khoản ngủ đông 60 ngày nay đột ngột đăng nhập trên thiết bị mới và chuyển đi số tiền gấp 10 lần số dư"*). Khả năng này giúp rút ngắn thời gian điều tra và ra quyết định (Decision Time) nhanh gấp 3 đến 5 lần, cho phép bộ phận AML duy trì hiệu suất ngay cả trong những mùa cao điểm thanh toán (Lễ, Tết).
+- Tính năng dịch các giá trị SHAP Value thành **narrative tự nhiên (Natural Language Explanations)** cung cấp cho Analyst một "hồ sơ tóm tắt tội phạm" ngay trên màn hình cảnh báo (Ví dụ: *"Giao dịch rủi ro do số tiền vượt 8.7 lần độ lệch chuẩn, lớn gấp 15.2 lần thói quen 30 ngày qua và gấp 19.3 lần số dư"*), giúp rút ngắn thời gian điều tra và ra quyết định nhanh gấp 3 đến 5 lần.
 
 ### 8.4. Giới hạn hiện tại & Hướng phát triển (Next Steps)
 Mặc dù hệ thống đã đáp ứng tốt các yêu cầu phát hiện hành vi lừa đảo phức tạp (ATO, Mule Account, Structuring), cấu trúc hiện tại vẫn còn một số điểm cần tiếp tục hoàn thiện để đạt chuẩn hệ sinh thái tăng trưởng lõi:
 
 1. **Xây dựng Vòng lặp Phản hồi (Active Feedback Loop):**
-   - *Hạn chế:* Mô hình hiện tại đang vận hành dựa trên gán nhãn tự động (PU Learning qua Isolation Forest). Nó chưa tận dụng được trí tuệ của con người.
-   - *Giải pháp:* Tích hợp giao diện để Analyst của ngân hàng có thể bấm nút `[Xác nhận Gian Lận]` hoặc `[Báo cáo Nhầm lẫn]` trực tiếp trên màn hình Alert. Các nhãn (labels) thực tế này sẽ được đưa ngược trở lại vào cơ sở dữ liệu để tái huấn luyện XGBoost qua phương pháp Supervised Learning, giúp mô hình ngày càng sắc bén hơn.
+   - Tích hợp giao diện để Analyst của ngân hàng có thể bấm nút `[Xác nhận Gian Lận]` hoặc `[Báo cáo Nhầm lẫn]` trực tiếp trên màn hình Alert để đưa ngược trở lại vào cơ sở dữ liệu tái huấn luyện mô hình XGBoost.
 
 2. **Nâng cấp kiến trúc Streaming thời gian thực (Real-time Stream Processing):**
-   - *Hạn chế:* Khâu tổng hợp đặc trưng (Feature Engineering) cho các cửa sổ trượt (rolling windows 1H, 24H) hiện đang được tính toán theo lô (batch processing) khi chạy giả lập.
-   - *Giải pháp:* Để đáp ứng lưu lượng hàng nghìn TPS (Transactions Per Second) của một ngân hàng Top Tier, cần dịch chuyển việc tính toán feature sang kiến trúc Streaming (sử dụng Apache Kafka và Apache Flink). Các bộ đếm (counter) sẽ được duy trì trong bộ nhớ trong (In-memory State) để đảm bảo thời gian truy xuất các biến số như `IP_HOPPING_VELOCITY` đạt ngưỡng dưới 1 mili-giây.
+   - Dịch chuyển việc tính toán đặc trưng sang kiến trúc Streaming (sử dụng Apache Kafka và Apache Flink) để đảm bảo thời gian truy xuất các biến số như `SPIKE_1H_VS_24H` đạt ngưỡng dưới 1 mili-giây dưới tải trọng hàng nghìn TPS.
 
 3. **Mở rộng kịch bản phòng vệ thẻ tín dụng (Credit Shield):**
-   - Tính năng chặn Bust-out và Structuring Overpayment đã chứng minh được hiệu quả. Trong tương lai, hệ thống cần bổ sung các Data source về điểm tín dụng CIC và thói quen mua sắm thương mại điện tử để phát hiện sớm hơn nữa ý định rửa tiền qua thẻ.
+   - Bổ sung các nguồn dữ liệu về điểm tín dụng CIC và hành vi chi tiêu thẻ để tối ưu hóa khả năng phát hiện sớm ý định rửa tiền hoặc lạm dụng hạn mức.
+
 

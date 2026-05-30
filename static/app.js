@@ -45,12 +45,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Set up EventSource for Server-Sent Events (SSE) log streaming
         const eventSource = new EventSource("/api/run/stream");
-        
+
         eventSource.onmessage = (event) => {
             const line = event.data;
             const logLine = document.createElement("div");
             logLine.textContent = line;
-            
+
             // Apply log-level styling
             if (line.includes("Error:") || line.includes("Traceback") || line.includes("ValueError")) {
                 logLine.style.color = "#f43f5e";
@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (line.includes("Execution completed successfully")) {
                 logLine.style.color = "#10b981";
             }
-            
+
             terminalLog.appendChild(logLine);
             terminalLog.scrollTop = terminalLog.scrollHeight;
 
@@ -112,16 +112,16 @@ document.addEventListener("DOMContentLoaded", () => {
         allRuns.forEach(run => {
             const item = document.createElement("li");
             item.className = `history-item ${run.id === activeRunId ? 'active' : ''}`;
-            
+
             // Format ID for clean display
             let title = run.id === "latest" ? "Latest Run" : run.id.replace("anomaly_alerts_", "");
-            const dateStr = run.metadata.timestamp 
+            const dateStr = run.metadata.timestamp
                 ? formatTimestamp(run.metadata.timestamp)
                 : "Unknown time";
-            
+
             const flagged = run.metadata.metrics?.anomalies_flagged ?? 0;
             const total = run.metadata.metrics?.total_records_evaluated ?? 0;
-            
+
             item.innerHTML = `
                 <div class="run-name">${title}</div>
                 <div class="run-meta">
@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span class="text-red">${flagged}/${total} alerts</span>
                 </div>
             `;
-            
+
             item.addEventListener("click", () => selectRun(run.id));
             historyList.appendChild(item);
         });
@@ -137,7 +137,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function selectRun(runId) {
         activeRunId = runId;
-        
+
         // Highlight in history sidebar
         document.querySelectorAll(".history-item").forEach((el, idx) => {
             const r = allRuns[idx];
@@ -154,8 +154,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Render header and timestamp
         let displayTitle = run.id === "latest" ? "Latest Run" : run.id.replace("anomaly_alerts_", "Run: ");
         runTitle.textContent = displayTitle;
-        runTimestamp.textContent = run.metadata.timestamp 
-            ? formatTimestamp(run.metadata.timestamp) 
+        runTimestamp.textContent = run.metadata.timestamp
+            ? formatTimestamp(run.metadata.timestamp)
             : "-";
 
         // Update stats metrics
@@ -175,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderAnomalyCards(anomalies) {
         alertsGrid.innerHTML = "";
-        
+
         if (!anomalies || anomalies.length === 0) {
             alertsGrid.innerHTML = `
                 <div class="empty-state">
@@ -193,7 +193,21 @@ document.addEventListener("DOMContentLoaded", () => {
             return scoreB - scoreA;
         });
 
-        sortedAnomalies.forEach((row, idx) => {
+        // Add a performance banner if truncating the anomalies list
+        if (anomalies.length > 500) {
+            const infoBanner = document.createElement("div");
+            infoBanner.className = "info-banner glass";
+            infoBanner.style.gridColumn = "1 / -1";
+            infoBanner.innerHTML = `
+                <span class="info-icon">ℹ</span>
+                <span>Showing the top 500 highest-risk anomalies (out of ${anomalies.length.toLocaleString()}) to optimize performance. Visit <strong><a href="/patterns" style="color:var(--color-accent-blue);text-decoration:none;">SHAP Distillation</a></strong> to view all distinct flagging patterns.</span>
+            `;
+            alertsGrid.appendChild(infoBanner);
+        }
+
+        const displayedAnomalies = sortedAnomalies.slice(0, 500);
+
+        displayedAnomalies.forEach((row, idx) => {
             const card = document.createElement("article");
             card.className = "anomaly-card";
 
@@ -286,7 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 confirmBtn.addEventListener("click", () => {
                     const txId = confirmBtn.getAttribute("data-transaction");
                     if (!txId) return;
-                    
+
                     fetch("/api/confirm_fraud", {
                         method: "POST",
                         headers: {
@@ -294,19 +308,19 @@ document.addEventListener("DOMContentLoaded", () => {
                         },
                         body: JSON.stringify({ transaction_id: txId })
                     })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.status === "success") {
-                            if (!confirmedTransactions.includes(txId)) {
-                                confirmedTransactions.push(txId);
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.status === "success") {
+                                if (!confirmedTransactions.includes(txId)) {
+                                    confirmedTransactions.push(txId);
+                                }
+                                confirmBtn.classList.add("confirmed");
+                                confirmBtn.querySelector("span").textContent = "Confirmed";
                             }
-                            confirmBtn.classList.add("confirmed");
-                            confirmBtn.querySelector("span").textContent = "Confirmed";
-                        }
-                    })
-                    .catch(err => {
-                        console.error("Failed to confirm fraud:", err);
-                    });
+                        })
+                        .catch(err => {
+                            console.error("Failed to confirm fraud:", err);
+                        });
                 });
             }
 
@@ -321,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     text += `* Transaction Type: ${row.TRANS_LV1 || "Unknown"} / ${row.TRANS_LV2 || "Unknown"}\n`;
                     text += `* Amount: ${formattedAmt} (Historical Avg: ${formattedAvgAmt})\n`;
                     text += `* Explanation Narrative: ${row.EXPLANATION || "No explanation provided"}\n`;
-                    
+
                     if (row.TOP_SHAP_CONTRIBUTORS) {
                         text += `* Top SHAP Drivers:\n`;
                         row.TOP_SHAP_CONTRIBUTORS.split(",").forEach(d => {
@@ -340,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             text += `  - ${c.trim()}\n`;
                         });
                     }
-                    
+
                     navigator.clipboard.writeText(text).then(() => {
                         const span = copyBtn.querySelector("span");
                         span.textContent = "Copied!";
@@ -412,7 +426,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (parts.length < 2) return;
             const feat = parts[0].trim();
             const flow = parts[1].trim();
-            
+
             const match = flow.match(/^(.+?)\s*[→&rarr;]\s*(.+?)\s*\(\s*([+-]?\d+[\d,.]*)\s*\)$/);
             if (match) {
                 parsed.push({

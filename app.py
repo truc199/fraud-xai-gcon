@@ -22,6 +22,93 @@ async def serve_index():
     with open("static/index.html", "r", encoding="utf-8") as f:
         return f.read()
 
+@app.get("/patterns", response_class=HTMLResponse)
+async def serve_patterns():
+    with open("static/patterns.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+@app.get("/api/shap_patterns")
+async def get_shap_patterns():
+    import re
+    latest_csv = "data/experimental_result.csv"
+    if not os.path.exists(latest_csv):
+        latest_csv = "data/anomaly_alerts_latest.csv"
+        
+    if not os.path.exists(latest_csv):
+        return {"patterns": [], "summary": {}}
+        
+    patterns_map = {}
+    total_alerts = 0
+    
+    try:
+        with open(latest_csv, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                total_alerts += 1
+                contributors = row.get("TOP_SHAP_CONTRIBUTORS", "") or ""
+                parts = [p.strip() for p in contributors.split(",") if p.strip()]
+                feature_names = []
+                for p in parts:
+                    m = re.match(r'^([a-zA-Z0-9_]+)', p)
+                    if m:
+                        feature_names.append(m.group(1))
+                
+                pattern_key = ", ".join(feature_names) if feature_names else "No SHAP contributors"
+                
+                try:
+                    score = float(row.get("ANOMALY_SCORE", 0.0))
+                except ValueError:
+                    score = 0.0
+                    
+                if pattern_key not in patterns_map:
+                    patterns_map[pattern_key] = {
+                        "pattern": pattern_key,
+                        "count": 0,
+                        "total_score": 0.0,
+                        "min_score": score,
+                        "max_score": score,
+                        "sample_transaction": {
+                            "transaction_id": row.get("TRANSACTION_ID", "N/A"),
+                            "customer_number": row.get("CUSTOMER_NUMBER", "N/A"),
+                            "explanation": row.get("EXPLANATION", "N/A"),
+                            "amount": row.get("TRANS_AMOUNT", "0"),
+                            "type": f"{row.get('TRANS_LV1', '')} / {row.get('TRANS_LV2', '')}".strip(" /") or "N/A"
+                        }
+                    }
+                
+                pat = patterns_map[pattern_key]
+                pat["count"] += 1
+                pat["total_score"] += score
+                if score < pat["min_score"]:
+                    pat["min_score"] = score
+                if score > pat["max_score"]:
+                    pat["max_score"] = score
+    except Exception as e:
+        return {"error": f"Failed to parse alerts CSV: {str(e)}", "patterns": [], "summary": {}}
+        
+    if total_alerts == 0:
+        return {"patterns": [], "summary": {}}
+        
+    sorted_patterns = sorted(patterns_map.values(), key=lambda x: x["count"], reverse=True)
+    
+    # Enrich with percentages and averages
+    top_5_sum = 0
+    for i, pat in enumerate(sorted_patterns):
+        pat["percentage"] = (pat["count"] / total_alerts) * 100.0
+        pat["avg_anomaly_score"] = pat["total_score"] / pat["count"]
+        # Delete helper total_score
+        del pat["total_score"]
+        if i < 5:
+            top_5_sum += pat["count"]
+            
+    summary = {
+        "total_alerts": total_alerts,
+        "total_distinct_patterns": len(sorted_patterns),
+        "top_5_coverage_pct": (top_5_sum / total_alerts) * 100.0 if total_alerts > 0 else 0.0
+    }
+    
+    return {"patterns": sorted_patterns, "summary": summary}
+
 @app.get("/api/exports")
 async def get_exports():
     """Scan and list all historical pipeline runs along with parsed CSV rows."""

@@ -14,6 +14,7 @@ This guide outlines rules and practices for modifying and running the fraud dete
     ```bash
     uv run <file.py>
     ```
+*   **never run the pipeline**
 
 ---
 
@@ -24,8 +25,9 @@ To test or implement a new pipeline mechanism (e.g., a new feature engineering m
 1.  **NEVER delete or overwrite existing component code** in the codebase.
 2.  **Create a new file** in the appropriate directory (e.g. `src/pipeline/second_order_markov_loader.py`).
 3.  **Implement a new class** that strictly declares the Python Protocol it implements in its class signature (e.g., `class SequenceRarityRule(RoutingRule):` is good; `class SequenceRarityRule:` is bad).
-4.  **Plug it into the demo runner**: Import your new component in `run_pipeline.py` and instantiate it there to swap behaviors dynamically.
-5.  **Align descriptions with rule logic**: For rules implementing `RoutingRule`, the `to_natural_language()` method must always align precisely with the active parameters and evaluation logic.
+4.  **all new dataloader and perprocessor must have caching strategy**
+5.  **Plug it into the demo runner**: Import your new component in `run_pipeline.py` and instantiate it there to swap behaviors dynamically.
+6.  **Align descriptions with rule logic**: For rules implementing `RoutingRule`, the `to_natural_language()` method must always align precisely with the active parameters and evaluation logic.
 
 ---
 

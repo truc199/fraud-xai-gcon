@@ -34,14 +34,25 @@ class ATOPanicRule(RoutingRule):
         hours_since_sec = pd.to_numeric(df.get('HOURS_SINCE_SEC_EVENT', 999.0)).fillna(999.0).values
         amounts = pd.to_numeric(df.get('TRANS_AMOUNT', 0.0)).fillna(0.0).values
         trans_lv2 = df.get('TRANS_LV2', pd.Series('', index=df.index)).fillna('').astype(str).values
-        hist_count = pd.to_numeric(df.get('HIST_TRANS_COUNT', 0)).fillna(0).values
 
-        is_recent_sec = hours_since_sec < self.hours_threshold
+        # Calculate tenure in days (current transaction time - registration date)
+        ts_dt = pd.to_datetime(df['TRANS_DATE']) + pd.to_timedelta(df['TRANS_HOUR'], unit='h')
+        reg_date = pd.to_datetime(df.get('IB_REGISTER_DATE')).fillna(pd.to_datetime(df.get('CLIENT_CREATE_DATE')))
+        reg_date = reg_date.fillna(ts_dt)  # Fallback: if registration date is missing, tenure is 0 days
+        tenure_days = (ts_dt - reg_date).dt.total_seconds() / (24 * 3600.0)
+        tenure_days = tenure_days.fillna(0.0).values
+
+        # Conditions: hours_since_sec <= threshold, TRANS_AMOUNT > threshold, TRANS_LV2 = 'Outside_bank'
+        is_recent_sec = hours_since_sec <= self.hours_threshold
         is_high_value = amounts > self.amount_threshold
-        is_outside = np.array([('Outside' in str(v)) for v in trans_lv2])
-        is_established = hist_count > self.min_hist_count
+        is_outside = np.array([(str(v) == 'Outside_bank' or 'Outside_bank' in str(v)) for v in trans_lv2])
 
-        is_block = is_recent_sec & is_high_value & is_outside & is_established
+        is_triggered = is_recent_sec & is_high_value & is_outside
+        
+        # If triggered and tenure >= 1.0 day -> Fraud (1)
+        # If triggered and tenure < 1.0 day -> Ambiguous (-1)
+        # If not triggered -> Ambiguous (-1)
+        is_block = is_triggered & (tenure_days >= 1.0)
 
         result = np.full(len(df), -1, dtype=int)
         result[is_block] = 1
@@ -49,8 +60,10 @@ class ATOPanicRule(RoutingRule):
 
     def to_natural_language(self) -> str:
         return (
-            f"Block if a security credential was changed within the last {self.hours_threshold:.1f} hour(s) "
+            f"Evaluate as Fraud (1) if a security credential was changed within the last {self.hours_threshold:.1f} hour(s) "
             f"and transaction amount exceeds {self.amount_threshold:,.0f} "
-            f"and transaction is directed outside the bank "
-            f"and the customer has more than {self.min_hist_count} historical transactions."
+            f"and transaction is directed to Outside_bank "
+            f"and customer account tenure is at least 1 day. "
+            f"If tenure is less than 1 day under these conditions, return Ambiguous (-1)."
         )
+

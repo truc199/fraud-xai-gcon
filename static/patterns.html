@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHAP Pattern Distillation — GContest AI</title>
+    <meta name="description" content="Distilled view of anomaly detection model flagging patterns grouped by top SHAP contributors.">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Vanilla CSS -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+    <div class="patterns-page">
+
+        <!-- Top Bar -->
+        <header class="patterns-topbar">
+            <a href="/" class="back-link" id="backLink">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+                <span>Dashboard</span>
+            </a>
+            <div class="patterns-title-area">
+                <h1>SHAP Pattern Distillation</h1>
+                <span class="patterns-subtitle">Model flagging archetypes — grouped by top-3 SHAP contributors</span>
+            </div>
+        </header>
+
+        <!-- Summary Metrics -->
+        <section class="patterns-summary" id="patternsSummary">
+            <div class="metric-card glass">
+                <div class="metric-label">Distinct Patterns</div>
+                <div id="totalPatterns" class="metric-val" style="color:var(--color-accent-blue)">—</div>
+                <div class="metric-sub">Unique top-3 feature combos</div>
+            </div>
+            <div class="metric-card glass">
+                <div class="metric-label">Total Flagged Alerts</div>
+                <div id="totalAlerts" class="metric-val text-red">—</div>
+                <div class="metric-sub">From anomaly_alerts_latest.csv</div>
+            </div>
+            <div class="metric-card glass">
+                <div class="metric-label">Most Common Pattern</div>
+                <div id="topPatternName" class="metric-val-sm">—</div>
+                <div id="topPatternSub" class="metric-sub">—</div>
+            </div>
+            <div class="metric-card glass">
+                <div class="metric-label">Top-5 Coverage</div>
+                <div id="topCoverage" class="metric-val">—</div>
+                <div class="metric-sub">% of alerts in top 5 patterns</div>
+            </div>
+        </section>
+
+        <!-- Pattern Cards -->
+        <section class="patterns-cards-section">
+            <h2 id="cardsHeading">Pattern Cards</h2>
+            <div id="patternsGrid" class="patterns-grid">
+                <div class="empty-state">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                    <p>Loading patterns…</p>
+                </div>
+            </div>
+        </section>
+
+    </div>
+    <!-- Vanilla JS -->
+    <script src="/static/patterns.js"></script>
+</body>
+</html>

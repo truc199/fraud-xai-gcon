@@ -6,17 +6,19 @@ import json
 import re
 import numpy as np
 from collections import Counter
-from src.pipeline.fraud_2026_data_loader import Fraud2026DataLoader
-from src.pipeline.custom_preprocessor import CustomPreprocessor
-from src.pipeline.custom_explainer import CustomBRACEExplainer
+from src.pipeline.new_features_data_loader import NewFeaturesDataLoader
+from src.pipeline.new_features_preprocessor import NewFeaturesPreprocessor
+from src.pipeline.new_features_explainer import NewFeaturesExplainer
 from src.pipeline.custom_orchestrator import CustomHierarchicalMLPipeline
 from src.pipeline.nnpu_c_classifier import NNPUCModelAgent
 from src.pipeline.ewc_model_agent import EWCModelAgent
 from src.pipeline.plugins import ConsoleLoggerPlugin, MetricsTrackerPlugin
-from src.pipeline.rules import SequenceRarityRule, VelocityBypassRule
+from src.pipeline.rules import SequenceRarityRule, VelocityBypassRule, SmallAmountBypassRule
 from src.pipeline.dormancy_wakeup_rule import DormancyWakeupRule
 from src.pipeline.ato_panic_rule import ATOPanicRule
 from src.pipeline.low_risk_channel_rule import LowRiskChannelBypassRule
+from src.pipeline.hourly_anomaly_rule import HourlyAnomalyRule
+from src.pipeline.credit_card_bustout_rule import CreditCardBustOutRule
 
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "gcontest.db"))
@@ -64,12 +66,12 @@ def main():
     print("=== Advanced Cohort Fraud & xAI Pipeline Demo ===")
     
     # 1. Instantiate modular components conforming to Protocols
-    data_loader = Fraud2026DataLoader(db_path=DB_PATH)
-    preprocessor = CustomPreprocessor()
+    data_loader = NewFeaturesDataLoader(db_path=DB_PATH)
+    preprocessor = NewFeaturesPreprocessor()
     
     # Use NNPU & C Calibrated XGBoost Model Agent (Option A + C)
     model_agent = NNPUCModelAgent(contamination=0.03)
-    explainer = CustomBRACEExplainer(background_data_limit=100)
+    explainer = NewFeaturesExplainer(background_data_limit=100)
     
     # Middlewares
     plugins = [ConsoleLoggerPlugin(), MetricsTrackerPlugin()]
@@ -77,13 +79,15 @@ def main():
     # 2. Assemble the Pipeline (Hierarchical Fallback Routing - Option B)
     rules = [
         # Existing BYPASS rules
-        SequenceRarityRule(rarity_threshold=-1.0, amount_threshold=500000.0),
+        SequenceRarityRule(rarity_threshold=-1.0, amount_threshold=5000000.0),
         VelocityBypassRule(amount_threshold=500000.0, count_1h_threshold=1.0, count_24h_threshold=2.0),
         # New BYPASS rule
         LowRiskChannelBypassRule(amount_threshold=5_000_000),
-        # New BLOCK rules (Fraud=1 overrides Safe=0 per orchestrator logic)
         DormancyWakeupRule(dormancy_days=90, amount_threshold=10_000_000),
         ATOPanicRule(hours_threshold=1.0, amount_threshold=10_000_000, min_hist_count=10),
+        HourlyAnomalyRule(prob_threshold=0.015, amount_threshold=10_000_000),
+        CreditCardBustOutRule(velocity_threshold=0.45, amount_threshold=20_000_000, ratio_threshold=10.0),
+        SmallAmountBypassRule(amount_threshold=500000.0),
     ]
     pipeline = CustomHierarchicalMLPipeline(
         data_loader=data_loader,
@@ -106,7 +110,17 @@ def main():
         except Exception as e:
             print(f"Warning: Failed to load confirmed frauds: {e}")
             
-    df_train = data_loader.load_training_data(limit=50000)
+    df_train = data_loader.load_training_data(limit=900000)
+    
+    # Print active features
+    preprocessor.fit(df_train)
+    sample_features = preprocessor.transform(df_train.head(1))
+    print("\n" + "="*60)
+    print(f"ACTIVE PIPELINE FEATURES ({len(sample_features.columns)} total):")
+    for idx, col in enumerate(sorted(sample_features.columns)):
+        print(f"  {idx+1}. {col}")
+    print("="*60 + "\n")
+
     y = pd.Series(0, index=df_train.index)
     if confirmed_transactions:
         y.loc[y.index.isin(confirmed_transactions)] = 1
@@ -114,14 +128,14 @@ def main():
     else:
         print("No confirmed fraud transactions loaded for training.")
         
-    pipeline.run_training_pipeline(limit=50000, y=y)
+    pipeline.run_training_pipeline(limit=900000, y=y)
     
     # 4. Fetch test batch (5,000 records) for inference and explanation
     print("\n--- Phase 2: Inference & xAI Generation ---")
-    df_test = data_loader.load_training_data(limit=5000)
+    df_test = data_loader.load_training_data(limit=900000)
     
     # Run prediction and generate explanations for all anomalies (up to 1000)
-    results = pipeline.run_inference_pipeline(df_test, explain_limit=1000)
+    results = pipeline.run_inference_pipeline(df_test, explain_limit=100000)
     
     # 5. Display the Explainable AI Alert Cards (limit console display to 3)
     explanations = results['explanations']
