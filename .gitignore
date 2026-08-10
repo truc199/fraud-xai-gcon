@@ -8,3 +8,5 @@ __pycache__/
 *.log
 eda/outputs/*.csv.gz
 
+/outline.docx
+/report.docx
